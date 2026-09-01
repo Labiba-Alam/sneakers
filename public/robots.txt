@@ -1,0 +1,21 @@
+# KINGSMAN Royal Luxury Sneakers - Technical SEO Robots Configuration
+User-agent: *
+Allow: /
+Allow: /catalog
+Allow: /collections/
+Allow: /products/
+Allow: /brand-story
+Allow: /wishlist
+
+# Disallow Private & Administrative Portals
+Disallow: /admin
+Disallow: /admin/*
+Disallow: /checkout
+Disallow: /api/
+Disallow: /auth/
+
+# Crawl Delay
+Crawl-delay: 1
+
+# Dynamic XML Sitemap Reference
+Sitemap: https://kingsman-luxury.com/sitemap.xml

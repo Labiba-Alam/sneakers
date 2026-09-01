@@ -1,0 +1,6 @@
+{
+  "name": "KINGSMAN Luxury Sneakers",
+  "description": "High-end luxury ecommerce platform for KINGSMAN curated premium sneaker imports in Bangladesh.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
