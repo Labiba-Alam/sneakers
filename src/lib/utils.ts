@@ -22,18 +22,13 @@ export function cn(...classes: (string | undefined | null | false | Record<strin
 
 /**
  * Currency Formatter
- * Base currency is USD, conversion rate for BDT is 120
+ * Entire site uses BDT (৳)
  */
 export function formatCurrency(
-  amountUSD: number, 
-  currency: Currency = 'USD', 
-  bdtRate: number = 120
+  amount: number, 
+  currency: Currency = 'BDT'
 ): string {
-  if (currency === 'BDT') {
-    const amountBDT = Math.round(amountUSD * bdtRate);
-    return `৳${amountBDT.toLocaleString('en-BD')}`;
-  }
-  return `$${amountUSD.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+  return `৳${Math.round(amount).toLocaleString('en-BD')}`;
 }
 
 /**

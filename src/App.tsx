@@ -33,6 +33,8 @@ const AdminDashboard = lazy(() => import('./components/AdminDashboard').then(m =
 const SizeGuideModal = lazy(() => import('./components/SizeGuideModal').then(m => ({ default: m.SizeGuideModal })));
 const OrderConfirmationModal = lazy(() => import('./components/OrderConfirmationModal').then(m => ({ default: m.OrderConfirmationModal })));
 const OrderTrackingModal = lazy(() => import('./components/OrderTrackingModal').then(m => ({ default: m.OrderTrackingModal })));
+const WishlistView = lazy(() => import('./components/WishlistView').then(m => ({ default: m.WishlistView })));
+const ContactView = lazy(() => import('./components/ContactView').then(m => ({ default: m.ContactView })));
 
 const SuspenseFallback: React.FC = () => (
   <div className="min-h-[50vh] flex flex-col items-center justify-center p-8 bg-[#0D0D0D]">
@@ -90,7 +92,7 @@ const MainContent: React.FC = () => {
           </Suspense>
         )}
 
-        {view === 'admin' && (
+        {(view === 'admin' || view === 'admin-login') && (
           <Suspense fallback={<SuspenseFallback />}>
             <AdminDashboard />
           </Suspense>
@@ -104,28 +106,16 @@ const MainContent: React.FC = () => {
           </>
         )}
 
+        {view === 'contact' && (
+          <Suspense fallback={<SuspenseFallback />}>
+            <ContactView />
+          </Suspense>
+        )}
+
         {view === 'wishlist' && (
-          <div className="py-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="mb-8">
-              <div className="flex items-center gap-2 text-[#C1121F] text-xs font-bold uppercase tracking-widest mb-1">
-                <Heart className="w-4 h-4 fill-[#C1121F]" />
-                <span>Royal Wishlist</span>
-              </div>
-              <h1 className="font-serif-luxury text-3xl font-bold text-[#111111]">YOUR SAVED SILHOUETTES</h1>
-            </div>
-            {wishlist.length === 0 ? (
-              <div className="text-center py-20 bg-white border border-[#111111]/10 p-8 shadow-sm">
-                <Heart className="w-12 h-12 text-[#111111]/20 mx-auto mb-4" />
-                <p className="font-serif-luxury text-xl font-bold text-[#111111] mb-2">Your Wishlist is Empty</p>
-                <p className="text-xs text-[#111111]/60 mb-6">Explore the collection and click the heart icon on any silhouette.</p>
-                <button onClick={() => setView('catalog')} className="px-6 py-3 bg-[#C1121F] text-white text-xs font-bold uppercase tracking-widest">
-                  Discover Sneakers
-                </button>
-              </div>
-            ) : (
-              <ProductGrid />
-            )}
-          </div>
+          <Suspense fallback={<SuspenseFallback />}>
+            <WishlistView />
+          </Suspense>
         )}
       </ResponsiveLayout>
 

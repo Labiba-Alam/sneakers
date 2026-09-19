@@ -1,13 +1,20 @@
 export type CategoryType = 
+  | 'Men Sneakers'
+  | 'Women Sneakers'
+  | 'Sports Shoes'
+  | 'Casual Sneakers'
+  | 'Running Shoes'
+  | 'Basketball Shoes'
+  | 'High Tops'
+  | 'Low Tops'
+  | 'Slides & Sandals'
+  | 'Accessories'
+  | 'New Arrivals'
+  | 'Sale'
   | 'Lifestyle'
   | 'Running'
   | 'Basketball'
-  | 'High Tops'
-  | 'Low Tops'
-  | 'Limited Edition'
-  | 'New Arrivals'
-  | 'Sale'
-  | 'Accessories';
+  | 'Limited Edition';
 
 export type PaymentMethod = 'COD' | 'SSLCommerz/Card' | 'bKash' | 'Nagad' | 'Rocket';
 
@@ -223,7 +230,7 @@ export interface FilterState {
   gender?: 'All' | 'Men' | 'Unisex';
 }
 
-export type Currency = 'USD' | 'BDT';
+export type Currency = 'BDT';
 
 export type ViewState = 
   | 'home'
@@ -234,7 +241,9 @@ export type ViewState =
   | 'order-confirmation'
   | 'order-tracking'
   | 'admin'
+  | 'admin-login'
   | 'brand-story'
+  | 'contact'
   | 'wishlist';
 
 export interface SEOProps {

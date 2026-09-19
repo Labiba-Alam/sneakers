@@ -23,11 +23,12 @@ export const CheckoutModal: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
 
-  // Selected District & Delivery Fee Calculation
+  // Selected District & Delivery Fee Calculation (BDT)
   const selectedDistrict = BANGLADESH_DISTRICTS.find(d => d.name === selectedDistrictName) || BANGLADESH_DISTRICTS[0];
   const isInsideDhaka = selectedDistrict.isDhaka;
-  const deliveryCharge = currency === 'BDT' ? selectedDistrict.deliveryChargeBDT : selectedDistrict.deliveryChargeUSD;
-  const isFreeDelivery = subtotal >= 300 || discountAmount >= subtotal;
+  const deliveryCharge = isInsideDhaka ? 80 : (selectedDistrict.deliveryChargeBDT || 130);
+  const freeDeliveryThreshold = 5000; // Free delivery in Bangladesh over ৳ 5,000
+  const isFreeDelivery = subtotal >= freeDeliveryThreshold || discountAmount >= subtotal;
   const actualDeliveryCharge = isFreeDelivery ? 0 : deliveryCharge;
   const grandTotal = Math.max(0, subtotal - discountAmount + actualDeliveryCharge);
 

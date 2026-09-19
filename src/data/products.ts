@@ -2,48 +2,48 @@ import { Product, CategoryType } from '../types';
 
 export const CATEGORIES_LIST: { name: CategoryType; description: string; image: string }[] = [
   {
-    name: 'Lifestyle',
-    description: 'Effortless luxury tailored for contemporary streetwear.',
+    name: 'Men Sneakers',
+    description: 'Precision-crafted luxury silhouettes engineered for discerning gentlemen in Bangladesh.',
     image: 'https://images.unsplash.com/photo-1552346154-21d32810aba3?auto=format&fit=crop&w=1200&q=85'
   },
   {
-    name: 'Running',
-    description: 'High-performance engineering with premium layered uppers and responsive cushioning.',
-    image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=1200&q=85'
-  },
-  {
-    name: 'Basketball',
-    description: 'Elevated court aesthetics with metallic accents and responsive traction soles.',
-    image: 'https://images.unsplash.com/photo-1579338559194-a162d19bf842?auto=format&fit=crop&w=1200&q=85'
-  },
-  {
-    name: 'High Tops',
-    description: 'Commanding silhouettes with padded ankle collars and royal crest detailing.',
-    image: 'https://images.unsplash.com/photo-1512374382149-233c42b6a83b?auto=format&fit=crop&w=1200&q=85'
-  },
-  {
-    name: 'Low Tops',
-    description: 'Clean, minimalist elegance selected for daily sophistication.',
+    name: 'Women Sneakers',
+    description: 'Effortless luxury tailored with sleek profiles, plush cushioning, and metallic accents.',
     image: 'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&w=1200&q=85'
   },
   {
-    name: 'Limited Edition',
-    description: 'Exclusive limited drops, individually inspected and certified authentic.',
-    image: 'https://images.unsplash.com/photo-1607522370275-f14206abe5d3?auto=format&fit=crop&w=1200&q=85'
+    name: 'Sports Shoes',
+    description: 'Performance-grade footwear combining athletic responsiveness with royal aesthetics.',
+    image: 'https://images.unsplash.com/photo-1579338559194-a162d19bf842?auto=format&fit=crop&w=1200&q=85'
   },
   {
-    name: 'New Arrivals',
-    description: 'The latest curated drops featuring season-defining colorways.',
+    name: 'Casual Sneakers',
+    description: 'Clean, minimalist elegance designed for daily wear and relaxed sophistication.',
     image: 'https://images.unsplash.com/photo-1600185365926-3a2ce3cdb9eb?auto=format&fit=crop&w=1200&q=85'
   },
   {
-    name: 'Sale',
-    description: 'Curated luxury silhouettes at special private-sale prices.',
-    image: 'https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?auto=format&fit=crop&w=1200&q=85'
+    name: 'Running Shoes',
+    description: 'High-rebound cushioning with engineered jacquard weave and breathable comfort.',
+    image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=1200&q=85'
+  },
+  {
+    name: 'Basketball Shoes',
+    description: 'Elevated court aesthetics featuring high-traction outsoles and padded ankle support.',
+    image: 'https://images.unsplash.com/photo-1512374382149-233c42b6a83b?auto=format&fit=crop&w=1200&q=85'
+  },
+  {
+    name: 'High Tops',
+    description: 'Commanding high-top silhouettes with padded collars and gold-tone insignias.',
+    image: 'https://images.unsplash.com/photo-1608231387042-66d1773070a5?auto=format&fit=crop&w=1200&q=85'
+  },
+  {
+    name: 'Slides & Sandals',
+    description: 'Ergonomic footbeds with premium velvet touch for effortless off-duty luxury.',
+    image: 'https://images.unsplash.com/photo-1607522370275-f14206abe5d3?auto=format&fit=crop&w=1200&q=85'
   },
   {
     name: 'Accessories',
-    description: 'Cedar shoe trees, brass horn kits, and metallic-tipped lace sets.',
+    description: 'Aromatic cedar shoe trees, metallic lace kits, and leather care essentials.',
     image: 'https://images.unsplash.com/photo-1543163521-1bf539c55dd2?auto=format&fit=crop&w=1200&q=85'
   }
 ];
@@ -79,24 +79,24 @@ const MODEL_NAMES = [
 ];
 
 const CATEGORIES: CategoryType[] = [
-  'Lifestyle', 'Running', 'Basketball', 'High Tops', 'Low Tops', 'Limited Edition', 'New Arrivals', 'Sale', 'Accessories'
+  'Men Sneakers', 'Women Sneakers', 'Sports Shoes', 'Casual Sneakers', 'Running Shoes', 'Basketball Shoes', 'High Tops', 'Accessories', 'New Arrivals', 'Sale'
 ];
 
-// Helper to generate 100 comprehensive products
+// Helper to generate 100 comprehensive products in Bangladeshi Taka (৳ BDT)
 function generateCatalog(): Product[] {
   const products: Product[] = [];
 
-  // 1. Featured Flagship Models
+  // 1. Featured Flagship Models (Exact ৳ BDT pricing)
   products.push({
     id: 'kng-001',
     name: 'KINGSMAN Sovereign Crimson I',
     subtitle: 'Curated premium luxury silhouette with polished gold-tone heel emblem.',
-    price: 680,
-    originalPrice: 780,
+    price: 6990,
+    originalPrice: 7990,
     discountPercent: 12,
     stock: 8,
     sku: 'KNG-SOV-CRM-01',
-    category: 'Limited Edition',
+    category: 'Men Sneakers',
     sizes: [40, 41, 42, 43, 44, 45],
     colors: [
       { name: 'Royal Crimson & Gold', hex: '#C1121F' },
@@ -134,8 +134,9 @@ function generateCatalog(): Product[] {
     id: 'kng-002',
     name: 'KINGSMAN Imperial Court High',
     subtitle: 'High-top court silhouette in matte obsidian and brushed gold-tone accents.',
-    price: 520,
-    originalPrice: 520,
+    price: 5490,
+    originalPrice: 5990,
+    discountPercent: 8,
     stock: 14,
     sku: 'KNG-IMP-CRT-02',
     category: 'High Tops',
@@ -173,12 +174,12 @@ function generateCatalog(): Product[] {
     id: 'kng-003',
     name: 'KINGSMAN Monarch Minimal Low',
     subtitle: 'Understated luxury low-top sneaker in smooth chalk finish.',
-    price: 450,
-    originalPrice: 490,
-    discountPercent: 8,
+    price: 4890,
+    originalPrice: 5290,
+    discountPercent: 7,
     stock: 22,
     sku: 'KNG-MNR-LOW-03',
-    category: 'Low Tops',
+    category: 'Casual Sneakers',
     sizes: [39, 40, 41, 42, 43, 44, 45],
     colors: [
       { name: 'Chalk White', hex: '#F8F8F8' },
@@ -203,7 +204,7 @@ function generateCatalog(): Product[] {
     isLimitedEdition: false,
     rating: 4.95,
     reviewCount: 64,
-    tags: ['Low Top', 'Minimal', 'White Sneaker', 'Daily Luxury'],
+    tags: ['Casual Sneakers', 'Minimal', 'White Sneaker', 'Daily Luxury'],
     relatedProductIds: ['kng-001', 'kng-006']
   });
 
@@ -211,11 +212,12 @@ function generateCatalog(): Product[] {
     id: 'kng-004',
     name: 'KINGSMAN Vanguard Royal Runner',
     subtitle: 'Ultralight performance runner with responsive high-rebound cushioning.',
-    price: 480,
-    originalPrice: 480,
+    price: 4250,
+    originalPrice: 4890,
+    discountPercent: 13,
     stock: 12,
     sku: 'KNG-VNG-RUN-04',
-    category: 'Running',
+    category: 'Running Shoes',
     sizes: [40, 41, 42, 43, 44, 45, 46],
     colors: [
       { name: 'Stealth Black & Crimson', hex: '#C1121F' },
@@ -240,7 +242,7 @@ function generateCatalog(): Product[] {
     isLimitedEdition: false,
     rating: 4.89,
     reviewCount: 38,
-    tags: ['Running', 'Cushioned', 'Performance Luxury'],
+    tags: ['Running Shoes', 'Cushioned', 'Performance Luxury'],
     relatedProductIds: ['kng-001', 'kng-005']
   });
 
@@ -249,8 +251,9 @@ function generateCatalog(): Product[] {
     id: 'kng-acc-01',
     name: 'KINGSMAN Royal Cedar & Velvet Shoe Tree Kit',
     subtitle: 'Aromatic Red Cedar wood trees wrapped in plush royal crimson velvet.',
-    price: 120,
-    originalPrice: 120,
+    price: 1250,
+    originalPrice: 1450,
+    discountPercent: 13,
     stock: 50,
     sku: 'KNG-ACC-TREE-01',
     category: 'Accessories',
@@ -280,8 +283,8 @@ function generateCatalog(): Product[] {
     id: 'kng-acc-02',
     name: 'KINGSMAN Gold Aglet Lace & Care Set',
     subtitle: 'Waxed cotton laces with engraved gold-tone screw-on aglets.',
-    price: 85,
-    originalPrice: 95,
+    price: 850,
+    originalPrice: 950,
     discountPercent: 10,
     stock: 75,
     sku: 'KNG-ACC-LACE-02',
@@ -311,7 +314,7 @@ function generateCatalog(): Product[] {
     tags: ['Accessory', 'Gold Laces', 'Customization']
   });
 
-  // Generate remaining 94 realistic items programmatically to reach ~100 products
+  // Generate remaining 94 realistic items programmatically in Bangladeshi Taka (৳ 3,250 to ৳ 6,990)
   let itemCounter = 5;
   for (let i = 0; i < 94; i++) {
     itemCounter++;
@@ -320,20 +323,23 @@ function generateCatalog(): Product[] {
     const num = String(itemCounter).padStart(3, '0');
     const image1 = SNEAKER_IMAGE_BANK[i % SNEAKER_IMAGE_BANK.length];
     const image2 = SNEAKER_IMAGE_BANK[(i + 1) % SNEAKER_IMAGE_BANK.length];
-    const priceBase = 320 + ((i * 17) % 680);
+    
+    // Realistic Bangladeshi Sneaker Pricing: ৳ 3,250 - ৳ 6,990
+    const priceBase = 3250 + ((i * 110) % 3600);
     const hasDiscount = i % 4 === 0;
-    const isLimited = cat === 'Limited Edition' || i % 7 === 0;
+    const discountAmount = hasDiscount ? 500 : 0;
+    const originalPrice = hasDiscount ? priceBase + discountAmount : priceBase;
+    const isLimited = cat === 'High Tops' || i % 7 === 0;
     const isNew = i % 3 === 0;
     const isBest = i % 5 === 0;
-    const isSale = cat === 'Sale' || hasDiscount;
 
     products.push({
       id: `kng-${num}`,
       name: `KINGSMAN ${baseName} ${num}`,
       subtitle: `Curated ${cat.toLowerCase()} silhouette featuring premium textured finish and gold-tone accents.`,
       price: priceBase,
-      originalPrice: hasDiscount ? priceBase + 60 : priceBase,
-      discountPercent: hasDiscount ? Math.round((60 / (priceBase + 60)) * 100) : undefined,
+      originalPrice: originalPrice,
+      discountPercent: hasDiscount ? Math.round((discountAmount / originalPrice) * 100) : undefined,
       stock: (i % 12) + 2, // Stock 2 to 14
       sku: `KNG-${cat.substring(0,3).toUpperCase()}-${num}`,
       category: cat,

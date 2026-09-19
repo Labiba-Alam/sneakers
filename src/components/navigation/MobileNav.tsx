@@ -120,7 +120,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({
             </div>
 
             {/* Navigation Links */}
-            <div className="space-y-1 text-xs uppercase tracking-[0.15em] font-bold border-t border-[#111111]/10 pt-4">
+            <div className="space-y-1 text-xs uppercase tracking-[0.15em] font-semibold border-t border-[#111111]/10 pt-4">
               <button
                 onClick={() => handleNavClick(undefined, 'home')}
                 className="w-full text-left py-3 border-b border-[#111111]/5 hover:text-[#C1121F]"
@@ -132,43 +132,49 @@ export const MobileNav: React.FC<MobileNavProps> = ({
                 onClick={() => handleNavClick(undefined, 'catalog')}
                 className="w-full text-left py-3 border-b border-[#111111]/5 hover:text-[#C1121F]"
               >
-                All Sneakers
+                Shop
               </button>
 
               <button
-                onClick={() => handleNavClick('Limited Edition', 'catalog')}
-                className="w-full text-left py-3 border-b border-[#111111]/5 text-[#C7A55B] font-extrabold flex items-center justify-between"
-              >
-                <span>Limited Drop</span>
-                <Crown className="w-4 h-4 text-[#C7A55B]" />
-              </button>
-
-              <button
-                onClick={() => handleNavClick('High Tops', 'catalog')}
+                onClick={() => handleNavClick('Men Sneakers', 'catalog')}
                 className="w-full text-left py-3 border-b border-[#111111]/5 hover:text-[#C1121F]"
               >
-                High Tops
+                Men
               </button>
 
               <button
-                onClick={() => handleNavClick('Low Tops', 'catalog')}
+                onClick={() => handleNavClick('Women Sneakers', 'catalog')}
                 className="w-full text-left py-3 border-b border-[#111111]/5 hover:text-[#C1121F]"
               >
-                Low Tops
+                Women
               </button>
 
               <button
-                onClick={() => handleNavClick('Running', 'catalog')}
+                onClick={() => handleNavClick('New Arrivals', 'catalog')}
                 className="w-full text-left py-3 border-b border-[#111111]/5 hover:text-[#C1121F]"
               >
-                Running
+                New Arrivals
+              </button>
+
+              <button
+                onClick={() => handleNavClick('Sale', 'catalog')}
+                className="w-full text-left py-3 border-b border-[#111111]/5 text-[#C1121F] font-bold"
+              >
+                Sale
               </button>
 
               <button
                 onClick={() => handleNavClick(undefined, 'brand-story')}
                 className="w-full text-left py-3 border-b border-[#111111]/5 hover:text-[#C1121F]"
               >
-                Heritage & Craft
+                About
+              </button>
+
+              <button
+                onClick={() => handleNavClick(undefined, 'contact')}
+                className="w-full text-left py-3 border-b border-[#111111]/5 hover:text-[#C1121F]"
+              >
+                Contact
               </button>
 
               <button
@@ -176,33 +182,29 @@ export const MobileNav: React.FC<MobileNavProps> = ({
                   onClose();
                   onOpenTracking();
                 }}
-                className="w-full text-left py-3 border-b border-[#111111]/5 text-[#C1121F] flex items-center gap-2"
+                className="w-full text-left py-3 border-b border-[#111111]/5 text-[#111111]/80 hover:text-[#C1121F] flex items-center gap-2"
               >
                 <Truck className="w-4 h-4" />
-                <span>Track Royal Order</span>
+                <span>Track Order</span>
               </button>
 
               <button
-                onClick={() => handleNavClick(undefined, 'admin')}
-                className="w-full text-left py-3 text-gray-600 flex items-center gap-2"
+                onClick={() => handleNavClick(undefined, 'admin-login')}
+                className="w-full text-left py-3 text-[#111111]/80 hover:text-[#C1121F] flex items-center gap-2"
               >
                 <ShieldCheck className="w-4 h-4" />
-                <span>Admin Dashboard</span>
+                <span>Admin & Profile</span>
               </button>
             </div>
           </div>
 
           {/* Drawer Footer Actions */}
-          <div className="pt-6 border-t border-[#111111]/10 space-y-3">
-            <button
-              onClick={() => setCurrency(currency === 'USD' ? 'BDT' : 'USD')}
-              className="w-full py-2.5 bg-white border border-[#111111]/20 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2"
-            >
-              <Globe className="w-4 h-4 text-[#C1121F]" />
-              <span>Currency: {currency}</span>
-            </button>
-            <p className="text-[10px] text-center text-[#111111]/50 font-semibold uppercase tracking-widest">
-              KINGSMAN FLORENCE ATELIER • MMXXVI
+          <div className="pt-6 border-t border-[#111111]/10 space-y-2">
+            <p className="text-[11px] text-center text-[#111111]/60 font-medium">
+              Bangladesh • All Prices in ৳ BDT
+            </p>
+            <p className="text-[10px] text-center text-[#111111]/40 uppercase tracking-widest">
+              KINGSMAN ROYAL SNEAKERS • DHAKA
             </p>
           </div>
         </motion.div>

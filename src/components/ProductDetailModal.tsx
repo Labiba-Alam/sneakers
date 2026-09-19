@@ -15,10 +15,60 @@ import { ProductReviewsSection } from './product/ProductReviewsSection';
 import { StickyMobileCartBar } from './product/StickyMobileCartBar';
 
 export const ProductDetailModal: React.FC = () => {
-  const { selectedProduct, products, addToRecentlyViewed } = useStore();
+  const { selectedProduct, products, addToRecentlyViewed, setView } = useStore();
 
-  // If no product is selected, fall back to first product from store
-  const product = selectedProduct || products[0];
+  // If no product is selected and products catalog is loading
+  if (products.length === 0) {
+    return (
+      <div className="bg-[#0B0B0B] text-[#F8F8F8] min-h-screen py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 animate-pulse">
+          <div className="h-6 w-48 bg-white/10 mb-8" />
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+            <div className="lg:col-span-7 aspect-[4/3] bg-white/10" />
+            <div className="lg:col-span-5 space-y-4">
+              <div className="h-4 w-32 bg-white/10" />
+              <div className="h-8 w-64 bg-white/10" />
+              <div className="h-6 w-24 bg-white/10" />
+              <div className="h-24 w-full bg-white/10" />
+              <div className="h-12 w-full bg-white/10" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // If no product is found/matched
+  if (!selectedProduct && products.length > 0) {
+    return (
+      <div className="bg-[#0B0B0B] text-[#F8F8F8] min-h-screen flex items-center justify-center py-20 px-4">
+        <div className="max-w-md w-full text-center space-y-6">
+          <div className="w-16 h-16 mx-auto bg-white/5 border border-white/15 flex items-center justify-center text-2xl font-serif text-[#C7A55B]">
+            404
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl sm:text-3xl font-royal font-black tracking-wider text-white">
+              SILHOUETTE NOT FOUND
+            </h2>
+            <p className="text-sm text-white/60 leading-relaxed">
+              The sneaker you are looking for has retired from our active archive or the URL may be incorrect.
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              setView('catalog');
+              try { window.history.pushState({ view: 'catalog' }, '', '/shop'); } catch {}
+            }}
+            className="inline-flex items-center justify-center px-8 py-3.5 bg-[#C1121F] hover:bg-[#a00f1a] text-white text-xs font-bold uppercase tracking-[0.2em] transition-colors shadow-lg"
+          >
+            Back to Shop
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const product = selectedProduct;
 
   useEffect(() => {
     if (product) {

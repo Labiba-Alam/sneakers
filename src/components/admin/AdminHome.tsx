@@ -236,7 +236,7 @@ export const AdminHome: React.FC<AdminHomeProps> = ({
             <span className="text-[10px] uppercase tracking-wider font-semibold">Today's Sales</span>
             <DollarSign className="w-4 h-4 text-[#C7A55B]" />
           </div>
-          <p className="text-xl font-bold font-mono text-white">${todaySales.toLocaleString()}</p>
+          <p className="text-xl font-bold font-mono text-white">৳ {todaySales.toLocaleString()}</p>
           <p className="text-[10px] text-emerald-400 font-semibold mt-1">↑ +18.4% vs yesterday</p>
         </div>
 
@@ -245,7 +245,7 @@ export const AdminHome: React.FC<AdminHomeProps> = ({
             <span className="text-[10px] uppercase tracking-wider font-semibold">Total Revenue</span>
             <TrendingUp className="w-4 h-4 text-emerald-400" />
           </div>
-          <p className="text-xl font-bold font-mono text-white">${totalRevenue.toLocaleString()}</p>
+          <p className="text-xl font-bold font-mono text-white">৳ {totalRevenue.toLocaleString()}</p>
           <p className="text-[10px] text-white/50 mt-1">Lifetime processed</p>
         </div>
 
@@ -277,7 +277,7 @@ export const AdminHome: React.FC<AdminHomeProps> = ({
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-sm font-bold text-white uppercase tracking-wider">Revenue & Growth Trajectory</h3>
-              <p className="text-[11px] text-white/50">Monthly gross volume in USD</p>
+              <p className="text-[11px] text-white/50">Monthly gross volume in ৳ BDT</p>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -301,10 +301,10 @@ export const AdminHome: React.FC<AdminHomeProps> = ({
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#222" />
                 <XAxis dataKey="month" stroke="#666" fontSize={11} />
-                <YAxis stroke="#666" fontSize={11} tickFormatter={(v) => `$${v/1000}k`} />
+                <YAxis stroke="#666" fontSize={11} tickFormatter={(v) => `৳${v/1000}k`} />
                 <Tooltip
                   contentStyle={{ backgroundColor: '#1A1A1A', borderColor: '#333', color: '#fff', fontSize: '12px' }}
-                  formatter={(value: any) => [`$${Number(value).toLocaleString()}`, 'Revenue']}
+                  formatter={(value: any) => [`৳ ${Number(value).toLocaleString()}`, 'Revenue']}
                 />
                 <Area type="monotone" dataKey="revenue" stroke="#C7A55B" strokeWidth={2} fillOpacity={1} fill="url(#colorRevenue)" />
               </AreaChart>

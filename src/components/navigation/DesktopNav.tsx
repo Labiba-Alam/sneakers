@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { Search, Heart, ShoppingBag, Crown, ChevronDown, Globe, Truck, ShieldCheck } from 'lucide-react';
+import { Search, Heart, ShoppingBag, Truck, User } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
-import { MegaMenu } from './MegaMenu';
 
 export interface DesktopNavProps {
   onOpenSearch: () => void;
@@ -40,62 +39,70 @@ export const DesktopNav: React.FC<DesktopNavProps> = ({
     <div className="relative w-full bg-[#F8F8F8]/95 backdrop-blur-md border-b border-[#111111]/10 text-[#111111] z-40 font-sans">
       <div className="max-w-[1600px] mx-auto px-6 h-20 flex items-center justify-between gap-6">
         
-        {/* Left Links & Mega Menu Trigger */}
-        <nav className="flex items-center gap-8 text-xs uppercase tracking-[0.18em] font-bold">
+        {/* Left Primary Navigation Links */}
+        <nav className="flex items-center gap-6 xl:gap-8 text-xs uppercase tracking-[0.16em] font-semibold">
           <button
             onClick={() => handleNavClick(undefined, 'home')}
             className={`transition-colors py-1 border-b-2 ${
-              view === 'home' ? 'border-[#C1121F] text-[#111111]' : 'border-transparent text-[#111111]/70 hover:text-[#111111]'
+              view === 'home' ? 'border-[#C1121F] text-[#111111] font-bold' : 'border-transparent text-[#111111]/70 hover:text-[#111111]'
             }`}
           >
             Home
           </button>
 
-          {/* Shop Mega Menu Hover Trigger */}
-          <div 
-            className="relative py-6"
-            onMouseEnter={() => setIsMegaMenuOpen(true)}
-          >
-            <button
-              onClick={() => handleNavClick(undefined, 'catalog')}
-              className={`transition-colors flex items-center gap-1.5 py-1 border-b-2 ${
-                view === 'catalog' ? 'border-[#C1121F] text-[#111111]' : 'border-transparent text-[#111111]/70 hover:text-[#111111]'
-              }`}
-            >
-              <span>Shop All</span>
-              <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isMegaMenuOpen ? 'rotate-180 text-[#C1121F]' : ''}`} />
-            </button>
-          </div>
-
           <button
-            onClick={() => handleNavClick('Limited Edition', 'catalog')}
-            className="text-[#C7A55B] hover:text-[#9e803d] font-extrabold transition-colors flex items-center gap-1.5"
+            onClick={() => handleNavClick(undefined, 'catalog')}
+            className={`transition-colors py-1 border-b-2 ${
+              view === 'catalog' ? 'border-[#C1121F] text-[#111111] font-bold' : 'border-transparent text-[#111111]/70 hover:text-[#111111]'
+            }`}
           >
-            <Crown className="w-3.5 h-3.5 text-[#C7A55B]" />
-            <span>Limited Drop</span>
+            Shop
           </button>
 
           <button
-            onClick={() => handleNavClick('High Tops', 'catalog')}
-            className="text-[#111111]/70 hover:text-[#111111] transition-colors"
+            onClick={() => handleNavClick('Men Sneakers', 'catalog')}
+            className="text-[#111111]/70 hover:text-[#111111] transition-colors py-1 border-b-2 border-transparent"
           >
-            High Tops
+            Men
           </button>
 
           <button
-            onClick={() => handleNavClick('Low Tops', 'catalog')}
-            className="text-[#111111]/70 hover:text-[#111111] transition-colors"
+            onClick={() => handleNavClick('Women Sneakers', 'catalog')}
+            className="text-[#111111]/70 hover:text-[#111111] transition-colors py-1 border-b-2 border-transparent"
           >
-            Low Tops
+            Women
+          </button>
+
+          <button
+            onClick={() => handleNavClick('New Arrivals', 'catalog')}
+            className="text-[#111111]/70 hover:text-[#111111] transition-colors py-1 border-b-2 border-transparent"
+          >
+            New Arrivals
+          </button>
+
+          <button
+            onClick={() => handleNavClick('Sale', 'catalog')}
+            className="text-[#C1121F] hover:text-[#9b0d18] font-bold transition-colors py-1 border-b-2 border-transparent"
+          >
+            Sale
           </button>
 
           <button
             onClick={() => handleNavClick(undefined, 'brand-story')}
             className={`transition-colors py-1 border-b-2 ${
-              view === 'brand-story' ? 'border-[#C1121F] text-[#111111]' : 'border-transparent text-[#111111]/70 hover:text-[#111111]'
+              view === 'brand-story' ? 'border-[#C1121F] text-[#111111] font-bold' : 'border-transparent text-[#111111]/70 hover:text-[#111111]'
             }`}
           >
-            Heritage
+            About
+          </button>
+
+          <button
+            onClick={() => handleNavClick(undefined, 'contact')}
+            className={`transition-colors py-1 border-b-2 ${
+              view === 'contact' ? 'border-[#C1121F] text-[#111111] font-bold' : 'border-transparent text-[#111111]/70 hover:text-[#111111]'
+            }`}
+          >
+            Contact
           </button>
         </nav>
 
@@ -118,23 +125,14 @@ export const DesktopNav: React.FC<DesktopNavProps> = ({
         </button>
 
         {/* Right Actions & Controls */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           
-          {/* Currency Switcher */}
-          <button
-            onClick={() => setCurrency(currency === 'USD' ? 'BDT' : 'USD')}
-            className="px-3 py-1.5 text-[11px] font-bold tracking-wider border border-[#111111]/20 bg-black/5 hover:bg-black/10 text-[#111111] transition-colors flex items-center gap-1.5"
-            title="Switch Currency (USD / BDT)"
-          >
-            <Globe className="w-3.5 h-3.5 text-[#C1121F]" />
-            <span>{currency}</span>
-          </button>
-
           {/* Track Order Quick Trigger */}
           <button
             onClick={onOpenTracking}
-            className="p-2 text-[#111111]/80 hover:text-[#C1121F] transition-colors"
-            title="Track Royal Order"
+            className="p-2.5 text-[#111111]/80 hover:text-[#C1121F] hover:bg-black/5 rounded-full transition-all"
+            title="Track Order"
+            aria-label="Track Order"
           >
             <Truck className="w-5 h-5" />
           </button>
@@ -142,21 +140,26 @@ export const DesktopNav: React.FC<DesktopNavProps> = ({
           {/* Search Trigger */}
           <button
             onClick={onOpenSearch}
-            className="p-2 text-[#111111]/80 hover:text-[#C1121F] transition-colors"
-            title="Search Shoes"
+            className="p-2.5 text-[#111111]/80 hover:text-[#C1121F] hover:bg-black/5 rounded-full transition-all"
+            title="Search Sneakers"
+            aria-label="Search"
           >
             <Search className="w-5 h-5" />
           </button>
 
           {/* Wishlist Icon */}
           <button
-            onClick={() => setView('wishlist')}
-            className="p-2 text-[#111111]/80 hover:text-[#C1121F] transition-colors relative"
-            title="Wishlist"
+            onClick={() => {
+              setView('wishlist');
+              try { window.history.pushState({ view: 'wishlist' }, '', '/wishlist'); } catch {}
+            }}
+            className="p-2.5 text-[#111111]/80 hover:text-[#C1121F] hover:bg-black/5 rounded-full transition-all relative"
+            title="Royal Wishlist"
+            aria-label="Wishlist"
           >
-            <Heart className={`w-5 h-5 ${wishlist.length > 0 ? 'text-[#C1121F] fill-[#C1121F]' : ''}`} />
+            <Heart className={`w-5 h-5 transition-transform active:scale-125 ${wishlist.length > 0 ? 'text-[#C1121F] fill-[#C1121F]' : ''}`} />
             {wishlist.length > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#C1121F] text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+              <span className="absolute 1 top-1 right-1 w-4 h-4 bg-[#C1121F] text-white text-[9px] font-bold rounded-full flex items-center justify-center shadow-sm">
                 {wishlist.length}
               </span>
             )}
@@ -165,36 +168,42 @@ export const DesktopNav: React.FC<DesktopNavProps> = ({
           {/* Shopping Bag / Cart */}
           <button
             onClick={onOpenCart}
-            className="p-2 text-[#111111]/80 hover:text-[#C1121F] transition-colors relative"
+            className="p-2.5 text-[#111111]/80 hover:text-[#C1121F] hover:bg-black/5 rounded-full transition-all relative"
             title="Shopping Bag"
+            aria-label="Shopping Bag"
           >
             <ShoppingBag className="w-5 h-5" />
             {cartCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#C7A55B] text-black text-[9px] font-black rounded-full flex items-center justify-center">
+              <span className="absolute top-1 right-1 w-4 h-4 bg-[#C7A55B] text-black text-[9px] font-black rounded-full flex items-center justify-center shadow-sm">
                 {cartCount}
               </span>
             )}
           </button>
 
-          {/* Admin Switcher */}
+          {/* Profile / Admin Login */}
           <button
-            onClick={() => setView(view === 'admin' ? 'home' : 'admin')}
-            className={`p-2 border transition-colors ${
-              view === 'admin'
-                ? 'bg-[#C1121F] border-[#C1121F] text-white'
-                : 'bg-black/5 border-[#111111]/15 text-[#111111]/70 hover:text-[#111111]'
+            onClick={() => {
+              if (view === 'admin' || view === 'admin-login') {
+                setView('home');
+              } else {
+                setView('admin-login');
+                try { window.history.pushState({ view: 'admin-login' }, '', '/admin/login'); } catch {}
+              }
+            }}
+            className={`p-2.5 rounded-full transition-all ${
+              view === 'admin' || view === 'admin-login'
+                ? 'bg-[#111111] text-[#C7A55B]'
+                : 'text-[#111111]/80 hover:text-[#111111] hover:bg-black/5'
             }`}
-            title="Admin Portal"
+            title="Atelier Profile & Admin"
+            aria-label="Profile and Admin"
           >
-            <ShieldCheck className="w-5 h-5" />
+            <User className="w-5 h-5" />
           </button>
 
         </div>
 
       </div>
-
-      {/* Mega Menu Dropdown Render */}
-      <MegaMenu isOpen={isMegaMenuOpen} onClose={() => setIsMegaMenuOpen(false)} />
     </div>
   );
 };

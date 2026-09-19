@@ -285,7 +285,7 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({
                 </div>
 
                 <div className="absolute bottom-2 right-2 px-2 py-0.5 bg-black/80 text-white font-mono text-xs font-bold rounded">
-                  ${product.price}
+                  ৳ {product.price.toLocaleString()}
                 </div>
               </div>
 
@@ -297,6 +297,11 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({
                     </h3>
                     <p className="text-[10px] text-white/50">{product.category}</p>
                   </div>
+                  {product.stock < 5 && (
+                    <span className="px-2 py-0.5 bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] font-bold uppercase rounded flex items-center gap-1 animate-pulse">
+                      <AlertCircle className="w-3 h-3" /> Low ({product.stock})
+                    </span>
+                  )}
                 </div>
 
                 {/* Stock per size badge list */}
@@ -432,7 +437,7 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({
                       </select>
                     </div>
                     <div>
-                      <label className="text-[10px] uppercase font-bold text-white/70 block mb-1">Price (USD)</label>
+                      <label className="text-[10px] uppercase font-bold text-white/70 block mb-1">Price (৳ BDT)</label>
                       <input
                         type="number"
                         required
@@ -442,7 +447,7 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] uppercase font-bold text-white/70 block mb-1">Original Price (USD)</label>
+                      <label className="text-[10px] uppercase font-bold text-white/70 block mb-1">Original Price (৳ BDT)</label>
                       <input
                         type="number"
                         value={formData.originalPrice || ''}

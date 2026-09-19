@@ -139,10 +139,10 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({
             </tbody>
           </table>
           <div class="total">
-            <p>Subtotal: $${order.subtotal}</p>
-            <p>Delivery Fee (${order.district}): $${order.shippingFee}</p>
-            <p>Discount: -$${order.discountAmount}</p>
-            <p style="font-size: 20px; color: #C1121F;">TOTAL PAID: $${order.total}</p>
+            <p>Subtotal: ৳ ${order.subtotal}</p>
+            <p>Delivery Fee (${order.district}): ৳ ${order.shippingFee}</p>
+            <p>Discount: -৳ ${order.discountAmount}</p>
+            <p style="font-size: 20px; color: #C1121F;">TOTAL PAID: ৳ ${order.total}</p>
           </div>
           <div class="footer">
             Thank you for choosing KINGSMAN Royal Sneakers. Every pair includes our lifetime authenticity card.
@@ -303,7 +303,7 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({
 
                     {/* Total */}
                     <td className="p-3.5 font-mono font-bold text-emerald-400">
-                      ${order.total}
+                      ৳ {order.total.toLocaleString()}
                     </td>
 
                     {/* Order Status Select */}
@@ -445,8 +445,8 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="font-mono text-xs font-bold text-emerald-400">${item.product.price} × {item.quantity}</p>
-                      <p className="font-mono text-xs text-white font-bold">${item.product.price * item.quantity}</p>
+                      <p className="font-mono text-xs font-bold text-emerald-400">৳ {item.product.price.toLocaleString()} × {item.quantity}</p>
+                      <p className="font-mono text-xs text-white font-bold">৳ {(item.product.price * item.quantity).toLocaleString()}</p>
                     </div>
                   </div>
                 ))}
@@ -459,9 +459,9 @@ export const AdminOrders: React.FC<AdminOrdersProps> = ({
                 <span>Payment: {inspectingOrder.paymentMethod}</span>
               </div>
               <div className="text-right">
-                <p className="text-xs text-white/60">Subtotal: ${inspectingOrder.subtotal}</p>
-                <p className="text-xs text-white/60">Shipping Fee: ${inspectingOrder.shippingFee}</p>
-                <p className="text-base text-emerald-400 font-bold">TOTAL: ${inspectingOrder.total}</p>
+                <p className="text-xs text-white/60">Subtotal: ৳ {inspectingOrder.subtotal.toLocaleString()}</p>
+                <p className="text-xs text-white/60">Shipping Fee: ৳ {inspectingOrder.shippingFee.toLocaleString()}</p>
+                <p className="text-base text-emerald-400 font-bold">TOTAL: ৳ {inspectingOrder.total.toLocaleString()}</p>
               </div>
             </div>
 

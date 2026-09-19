@@ -66,6 +66,7 @@ interface StoreContextType {
   clearCompare: () => void;
   recentlyViewed: string[];
   addRecentlyViewed: (productId: string) => void;
+  addToRecentlyViewed: (productOrId: Product | string) => void;
   quickViewProduct: Product | null;
   setQuickViewProduct: (product: Product | null) => void;
   
@@ -141,7 +142,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
 
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
-  const [currency, setCurrency] = useState<Currency>('USD');
+  const [currency, setCurrency] = useState<Currency>('BDT');
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
@@ -213,6 +214,62 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch {}
   }, []);
 
+  // URL and Browser History Synchronization for Deep Links (/products/:id, /wishlist, /admin/login, /admin/dashboard, /shop)
+  useEffect(() => {
+    const handleLocation = () => {
+      try {
+        const path = window.location.pathname;
+        if (path.startsWith('/products/') || path.startsWith('/product/')) {
+          const id = path.split('/')[2];
+          if (id) {
+            const match = products.find(p => p.id.toLowerCase() === id.toLowerCase() || p.sku.toLowerCase() === id.toLowerCase());
+            if (match) {
+              setSelectedProduct(match);
+              setView('product-detail');
+            } else {
+              // Product not found will be caught by 404 handler
+              setSelectedProduct(null);
+              setView('product-detail');
+            }
+            return;
+          }
+        }
+        if (path === '/wishlist') {
+          setView('wishlist');
+          return;
+        }
+        if (path === '/admin/login' || path === '/admin') {
+          setView('admin-login');
+          return;
+        }
+        if (path === '/admin/dashboard') {
+          setView('admin');
+          return;
+        }
+        if (path === '/shop' || path === '/catalog') {
+          setView('catalog');
+          return;
+        }
+        if (path === '/checkout') {
+          setView('checkout');
+          return;
+        }
+        if (path === '/about' || path === '/brand-story') {
+          setView('brand-story');
+          return;
+        }
+        if (path === '/contact') {
+          setView('contact');
+          return;
+        }
+      } catch {}
+    };
+
+    handleLocation();
+    window.addEventListener('popstate', handleLocation);
+    return () => window.removeEventListener('popstate', handleLocation);
+  }, [products]);
+
   // GA4 & Meta Pixel Page View Tracking on View Change
   useEffect(() => {
     const titles: Record<string, string> = {
@@ -251,11 +308,19 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
   };
 
+  const addToRecentlyViewed = (productOrId: Product | string) => {
+    const id = typeof productOrId === 'string' ? productOrId : productOrId?.id;
+    if (id) addRecentlyViewed(id);
+  };
+
   const openProductDetail = (product: Product) => {
     setSelectedProduct(product);
     addRecentlyViewed(product.id);
     setView('product-detail');
     trackProductView(product, currency);
+    try {
+      window.history.pushState({ view: 'product-detail', productId: product.id }, '', `/products/${product.id}`);
+    } catch {}
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -346,18 +411,14 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }
 
-  const freeShippingThreshold = 300; // Complimentary Express Shipping over $300
-  const shippingFee = subtotal >= freeShippingThreshold || cart.length === 0 ? 0 : 25;
+  const freeShippingThreshold = 5000; // Complimentary Delivery in Bangladesh over ৳ 5,000
+  const shippingFee = subtotal >= freeShippingThreshold || cart.length === 0 ? 0 : 80;
   const total = Math.max(0, subtotal - discountAmount + shippingFee);
 
-  // Currency Formatter
-  // USD to BDT rate: 1 USD = 120 BDT
-  const formatPrice = (amountInUSD: number) => {
-    if (currency === 'BDT') {
-      const bdtAmount = Math.round(amountInUSD * 120);
-      return `৳ ${bdtAmount.toLocaleString('en-US')}`;
-    }
-    return `$${amountInUSD.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  // Currency Formatter - Strictly ৳ BDT formatting
+  const formatPrice = (amount: number) => {
+    if (typeof amount !== 'number' || isNaN(amount)) return '৳ 0';
+    return `৳ ${Math.round(amount).toLocaleString('en-US')}`;
   };
 
   // Wishlist & Compare
@@ -516,6 +577,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         clearCompare,
         recentlyViewed,
         addRecentlyViewed,
+        addToRecentlyViewed,
         quickViewProduct,
         setQuickViewProduct,
         activeOrder,
