@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Product, CartItem, Order, Coupon, FilterState, Currency, ViewState, CategoryType } from '../types';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { Product, CartItem, Order, Coupon, FilterState, Currency, ViewState, CategoryType, CustomerAccount } from '../types';
 import { INITIAL_PRODUCTS } from '../data/products';
 import { 
   trackPageView, 
@@ -88,12 +88,26 @@ interface StoreContextType {
   setIsSizeGuideOpen: (open: boolean) => void;
   isOrderTrackingOpen: boolean;
   setIsOrderTrackingOpen: (open: boolean) => void;
+
+  // Customer Account & Authentication
+  customer: CustomerAccount | null;
+  isCustomerLoggedIn: boolean;
+  isAuthModalOpen: boolean;
+  setIsAuthModalOpen: (open: boolean) => void;
+  authModalTab: 'login' | 'register';
+  setAuthModalTab: (tab: 'login' | 'register') => void;
+  openAuthModal: (tab?: 'login' | 'register') => void;
+  closeAuthModal: () => void;
+  customerLogin: (identifier: string, password?: string) => Promise<boolean>;
+  customerRegister: (data: { fullName: string; phone: string; email?: string; password?: string }) => Promise<boolean>;
+  customerLogout: () => void;
+  updateCustomerProfile: (data: Partial<CustomerAccount>) => void;
 }
 
 const DEFAULT_FILTERS: FilterState = {
   category: 'All',
   minPrice: 0,
-  maxPrice: 1500,
+  maxPrice: 15000,
   selectedSizes: [],
   selectedColors: [],
   inStockOnly: false,
@@ -150,6 +164,21 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const [allOrders, setAllOrders] = useState<Order[]>([]);
   const [toasts, setToasts] = useState<Toast[]>([]);
+
+  // Customer Account state with local persistence
+  const [customer, setCustomer] = useState<CustomerAccount | null>(() => {
+    try {
+      const saved = localStorage.getItem('kingsman_customer');
+      if (saved) return JSON.parse(saved);
+      return null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authModalTab, setAuthModalTab] = useState<'login' | 'register'>('login');
+  const [previousPathBeforeAuth, setPreviousPathBeforeAuth] = useState<string>('/');
 
   // Local storage persistence
   useEffect(() => {
@@ -224,42 +253,51 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           if (id) {
             const match = products.find(p => p.id.toLowerCase() === id.toLowerCase() || p.sku.toLowerCase() === id.toLowerCase());
             if (match) {
-              setSelectedProduct(match);
-              setView('product-detail');
+              setSelectedProduct(prev => prev?.id === match.id ? prev : match);
+              setView(prev => prev === 'product-detail' ? prev : 'product-detail');
             } else {
-              // Product not found will be caught by 404 handler
-              setSelectedProduct(null);
-              setView('product-detail');
+              setSelectedProduct(prev => prev === null ? prev : null);
+              setView(prev => prev === 'product-detail' ? prev : 'product-detail');
             }
             return;
           }
         }
         if (path === '/wishlist') {
-          setView('wishlist');
+          setView(prev => prev === 'wishlist' ? prev : 'wishlist');
           return;
         }
         if (path === '/admin/login' || path === '/admin') {
-          setView('admin-login');
+          setView(prev => prev === 'admin-login' ? prev : 'admin-login');
           return;
         }
         if (path === '/admin/dashboard') {
-          setView('admin');
+          setView(prev => prev === 'admin' ? prev : 'admin');
           return;
         }
         if (path === '/shop' || path === '/catalog') {
-          setView('catalog');
+          setView(prev => prev === 'catalog' ? prev : 'catalog');
           return;
         }
         if (path === '/checkout') {
-          setView('checkout');
+          setView(prev => prev === 'checkout' ? prev : 'checkout');
           return;
         }
         if (path === '/about' || path === '/brand-story') {
-          setView('brand-story');
+          setView(prev => prev === 'brand-story' ? prev : 'brand-story');
           return;
         }
         if (path === '/contact') {
-          setView('contact');
+          setView(prev => prev === 'contact' ? prev : 'contact');
+          return;
+        }
+        if (path === '/account' || path === '/login') {
+          setIsAuthModalOpen(prev => prev ? prev : true);
+          setAuthModalTab(prev => prev === 'login' ? prev : 'login');
+          return;
+        }
+        if (path === '/register' || path === '/signup') {
+          setIsAuthModalOpen(prev => prev ? prev : true);
+          setAuthModalTab(prev => prev === 'register' ? prev : 'register');
           return;
         }
       } catch {}
@@ -299,19 +337,22 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }, 3500);
   };
 
-  const addRecentlyViewed = (productId: string) => {
+  const addRecentlyViewed = useCallback((productId: string) => {
     setRecentlyViewed(prev => {
+      if (prev.length > 0 && prev[0] === productId) {
+        return prev;
+      }
       const filtered = prev.filter(id => id !== productId);
       const next = [productId, ...filtered].slice(0, 8);
       localStorage.setItem('kingsman_recently_viewed', JSON.stringify(next));
       return next;
     });
-  };
+  }, []);
 
-  const addToRecentlyViewed = (productOrId: Product | string) => {
+  const addToRecentlyViewed = useCallback((productOrId: Product | string) => {
     const id = typeof productOrId === 'string' ? productOrId : productOrId?.id;
     if (id) addRecentlyViewed(id);
-  };
+  }, [addRecentlyViewed]);
 
   const openProductDetail = (product: Product) => {
     setSelectedProduct(product);
@@ -538,6 +579,94 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  // Customer Account handlers
+  const customerLogin = async (identifier: string, password?: string): Promise<boolean> => {
+    const isEmail = identifier.includes('@');
+    const userEmail = isEmail ? identifier : (customer?.email || 'alam.labiba003@gmail.com');
+    const userPhone = isEmail ? (customer?.phone || '+880 1712-345678') : identifier;
+    const namePart = isEmail ? identifier.split('@')[0] : 'Member';
+    const userName = namePart.toLowerCase() === 'alam.labiba003' 
+      ? 'Labiba Alam' 
+      : namePart.replace(/[._]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+
+    const loggedUser: CustomerAccount = {
+      id: customer?.id || 'cst-8801',
+      fullName: customer?.fullName || userName,
+      phone: userPhone,
+      email: userEmail,
+      district: customer?.district || 'Dhaka',
+      area: customer?.area || 'Gulshan-2',
+      address: customer?.address || 'Road 71, House 12, Gulshan-2, Dhaka 1212',
+      createdAt: customer?.createdAt || '2024-01-15',
+      totalOrders: customer?.totalOrders || 3,
+      totalSpent: customer?.totalSpent || 48500,
+      vipTier: customer?.vipTier || 'Royal Platinum',
+      accountStatus: 'Active',
+    };
+
+    setCustomer(loggedUser);
+    localStorage.setItem('kingsman_customer', JSON.stringify(loggedUser));
+    showToast(`Welcome back, ${loggedUser.fullName}!`, 'success');
+    return true;
+  };
+
+  const customerRegister = async (data: { fullName: string; phone: string; email?: string; password?: string }): Promise<boolean> => {
+    const newCustomer: CustomerAccount = {
+      id: 'cst-' + Math.floor(1000 + Math.random() * 9000),
+      fullName: data.fullName,
+      phone: data.phone,
+      email: data.email || `${data.fullName.toLowerCase().replace(/\s+/g, '.')}@kingsman.royal`,
+      district: 'Dhaka',
+      area: 'Dhanmondi',
+      address: 'House 42, Road 7/A, Dhanmondi, Dhaka 1209',
+      createdAt: new Date().toISOString().split('T')[0],
+      totalOrders: 0,
+      totalSpent: 0,
+      vipTier: 'Member',
+      accountStatus: 'Active',
+    };
+
+    setCustomer(newCustomer);
+    localStorage.setItem('kingsman_customer', JSON.stringify(newCustomer));
+    showToast(`Welcome to Kingsman, ${newCustomer.fullName}! Your royal account is active.`, 'success');
+    return true;
+  };
+
+  const customerLogout = () => {
+    setCustomer(null);
+    localStorage.removeItem('kingsman_customer');
+    showToast('Signed out of Kingsman customer account.', 'info');
+  };
+
+  const updateCustomerProfile = (data: Partial<CustomerAccount>) => {
+    setCustomer(prev => {
+      if (!prev) return null;
+      const updated = { ...prev, ...data };
+      localStorage.setItem('kingsman_customer', JSON.stringify(updated));
+      return updated;
+    });
+    showToast('Customer profile updated.', 'success');
+  };
+
+  const openAuthModal = useCallback((tab: 'login' | 'register' = 'login') => {
+    setAuthModalTab(tab);
+    setPreviousPathBeforeAuth(window.location.pathname);
+    setIsAuthModalOpen(true);
+    try {
+      window.history.pushState({ modal: 'auth' }, '', tab === 'register' ? '/register' : '/account');
+    } catch {}
+  }, []);
+
+  const closeAuthModal = useCallback(() => {
+    setIsAuthModalOpen(false);
+    try {
+      const target = previousPathBeforeAuth && !['/account', '/login', '/register', '/signup'].includes(previousPathBeforeAuth)
+        ? previousPathBeforeAuth
+        : (view === 'home' ? '/' : `/${view}`);
+      window.history.pushState(null, '', target);
+    } catch {}
+  }, [previousPathBeforeAuth, view]);
+
   return (
     <StoreContext.Provider
       value={{
@@ -592,7 +721,19 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         isSizeGuideOpen,
         setIsSizeGuideOpen,
         isOrderTrackingOpen,
-        setIsOrderTrackingOpen
+        setIsOrderTrackingOpen,
+        customer,
+        isCustomerLoggedIn: Boolean(customer),
+        isAuthModalOpen,
+        setIsAuthModalOpen,
+        authModalTab,
+        setAuthModalTab,
+        openAuthModal,
+        closeAuthModal,
+        customerLogin,
+        customerRegister,
+        customerLogout,
+        updateCustomerProfile
       }}
     >
       {children}

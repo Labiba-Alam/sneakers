@@ -24,6 +24,7 @@ import { SEOHead } from './components/SEOHead';
 import { PWAInstallPrompt } from './components/pwa/PWAInstallPrompt';
 import { CookieConsentBanner } from './components/CookieConsentBanner';
 import { ResponsiveLayout } from './components/layout/ResponsiveLayout';
+import { CustomerAccountModal } from './components/CustomerAccountModal';
 import { Heart } from 'lucide-react';
 
 // Lazy-Loaded Heavy Modals & Views (Code Splitting for Optimal Bundle Size)
@@ -122,6 +123,7 @@ const MainContent: React.FC = () => {
       {/* Overlays & Modals */}
       <CartDrawer />
       <SearchModal />
+      <CustomerAccountModal />
       <Suspense fallback={null}>
         <SizeGuideModal />
         <OrderTrackingModal />

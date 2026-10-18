@@ -17,6 +17,36 @@ import { StickyMobileCartBar } from './product/StickyMobileCartBar';
 export const ProductDetailModal: React.FC = () => {
   const { selectedProduct, products, addToRecentlyViewed, setView } = useStore();
 
+  const product = selectedProduct;
+
+  const [selectedSize, setSelectedSize] = useState<number>(42);
+  const [selectedColor, setSelectedColor] = useState<{ name: string; hex: string }>({
+    name: 'Royal Crimson',
+    hex: '#C1121F'
+  });
+  const [quantity, setQuantity] = useState(1);
+
+  // Sync size and color when product changes
+  useEffect(() => {
+    if (product) {
+      if (product.sizes?.length) {
+        setSelectedSize(product.sizes[0]);
+      }
+      if (product.colors?.length) {
+        setSelectedColor(product.colors[0]);
+      }
+      setQuantity(1);
+    }
+  }, [product?.id]);
+
+  // Track recently viewed once when product ID changes
+  useEffect(() => {
+    if (product) {
+      addToRecentlyViewed(product);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [product?.id]);
+
   // If no product is selected and products catalog is loading
   if (products.length === 0) {
     return (
@@ -67,21 +97,6 @@ export const ProductDetailModal: React.FC = () => {
       </div>
     );
   }
-
-  const product = selectedProduct;
-
-  useEffect(() => {
-    if (product) {
-      addToRecentlyViewed(product);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  }, [product, addToRecentlyViewed]);
-
-  const [selectedSize, setSelectedSize] = useState<number>(product?.sizes[0] || 42);
-  const [selectedColor, setSelectedColor] = useState(
-    product?.colors[0] || { name: 'Royal Crimson', hex: '#C1121F' }
-  );
-  const [quantity, setQuantity] = useState(1);
 
   if (!product) return null;
 

@@ -55,35 +55,32 @@ export const ShopHeroBanner: React.FC = () => {
   const content = getBannerContent();
 
   return (
-    <div className="relative bg-[#0D0D0D] border-b border-white/10 py-12 px-4 sm:px-6 lg:px-8 overflow-hidden">
+    <div className="relative bg-[#0D0D0D] border-b border-white/10 py-5 sm:py-8 lg:py-10 px-4 sm:px-6 lg:px-8 overflow-hidden">
       {/* Soft Gradient Atmosphere */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[200px] bg-[#C1121F]/10 blur-[120px] pointer-events-none" />
       
-      <div className="max-w-7xl mx-auto relative z-10 text-center sm:text-left flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+      <div className="max-w-7xl mx-auto relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/5 border border-white/10 text-[10px] text-[#C7A55B] font-bold uppercase tracking-widest mb-3">
-            <Sparkles className="w-3.5 h-3.5 text-[#C7A55B]" />
+          <div className="inline-flex items-center gap-2 px-2.5 py-0.5 sm:px-3 sm:py-1 bg-white/5 border border-white/10 text-[9px] sm:text-[10px] text-[#C7A55B] font-bold uppercase tracking-widest mb-1.5 sm:mb-2.5">
+            <Sparkles className="w-3 h-3 text-[#C7A55B]" />
             <span>{content.badge}</span>
           </div>
 
-          <h1 className="font-serif-luxury text-2xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight">
+          <h1 className="font-serif-luxury text-xl sm:text-3xl lg:text-4xl font-bold text-white tracking-tight">
             {content.title}
           </h1>
 
-          <p className="text-xs sm:text-sm text-white/60 font-light mt-2 max-w-2xl leading-relaxed">
+          <p className="text-xs sm:text-sm text-white/60 font-light mt-1 sm:mt-2 max-w-2xl leading-relaxed hidden sm:block">
             {content.subtitle}
           </p>
         </div>
 
-        {/* Quick CTA */}
-        <div className="shrink-0">
-          <a
-            href="#catalog-grid"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-[#C1121F] hover:bg-[#a30f1a] text-white text-xs font-bold uppercase tracking-widest transition-colors shadow-lg"
-          >
-            <span>Explore Collection</span>
-            <ArrowRight className="w-4 h-4" />
-          </a>
+        {/* Desktop Quick Badge */}
+        <div className="hidden lg:block shrink-0">
+          <div className="text-right">
+            <span className="text-[10px] text-[#C7A55B] uppercase tracking-widest font-mono block">Authentic Florentine Import</span>
+            <span className="text-xs text-white/50">Inspected & Delivered in Dhaka</span>
+          </div>
         </div>
       </div>
     </div>

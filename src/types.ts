@@ -244,7 +244,8 @@ export type ViewState =
   | 'admin-login'
   | 'brand-story'
   | 'contact'
-  | 'wishlist';
+  | 'wishlist'
+  | 'account';
 
 export interface SEOProps {
   title: string;
