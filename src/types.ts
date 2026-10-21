@@ -18,7 +18,7 @@ export type CategoryType =
 
 export type PaymentMethod = 'COD' | 'SSLCommerz/Card' | 'bKash' | 'Nagad' | 'Rocket';
 
-export type PaymentStatus = 'Pending' | 'Paid' | 'Failed' | 'Due' | 'Cancelled';
+export type PaymentStatus = 'Pending' | 'Paid' | 'Failed' | 'Due' | 'Cancelled' | 'Delivery Fee Paid';
 
 export type OrderStatus = 
   | 'Pending' 
@@ -137,7 +137,7 @@ export interface Product {
   id: string;
   name: string;
   subtitle: string;
-  price: number; // in USD base
+  price: number; // in BDT
   originalPrice?: number;
   discountPercent?: number;
   stock: number;
@@ -189,6 +189,7 @@ export interface Coupon {
 
 export interface Order {
   id: string;
+  idempotencyKey?: string;
   customerName: string;
   customerPhone: string;
   customerEmail?: string;
@@ -205,7 +206,12 @@ export interface Order {
   discountAmount: number;
   shippingFee: number;
   total: number;
-  currency: 'USD' | 'BDT';
+  currency: 'BDT';
+  advanceDeliveryFeePaid?: boolean;
+  advanceDeliveryFeeTrxId?: string;
+  advanceDeliveryFeeMethod?: 'bKash' | 'Nagad' | 'Rocket' | 'Online Gateway';
+  remainingAmountDue?: number;
+  courierPartner?: 'Steadfast' | 'Pathao';
   createdAt: string;
   trackingNumber: string;
   paymentDetails?: {
@@ -245,7 +251,11 @@ export type ViewState =
   | 'brand-story'
   | 'contact'
   | 'wishlist'
-  | 'account';
+  | 'account'
+  | 'shipping-policy'
+  | 'refund-policy'
+  | 'terms'
+  | 'privacy-policy';
 
 export interface SEOProps {
   title: string;

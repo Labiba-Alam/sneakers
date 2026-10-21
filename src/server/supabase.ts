@@ -131,57 +131,7 @@ export async function seedSupabaseIfEmpty(): Promise<void> {
 
       await supabaseClient.from('coupons').upsert(couponRows, { onConflict: 'code' });
 
-      // 4. Seed Initial Sample Customer & Order
-      const { data: customerData } = await supabaseClient
-        .from('customers')
-        .upsert(
-          {
-            full_name: 'Marcus Sterling',
-            phone: '+1 555-019-2834',
-            email: 'm.sterling@kingsman.royal',
-            district: 'Dhaka - Inside City',
-            area: 'Manhattan',
-            address: '450 Park Avenue, Penthouse B',
-            vip_tier: 'Royal Platinum',
-          },
-          { onConflict: 'phone' }
-        )
-        .select()
-        .single();
-
-      await supabaseClient.from('orders').upsert({
-        id: 'KNG-2026-8942',
-        customer_name: 'Marcus Sterling',
-        customer_phone: '+1 555-019-2834',
-        customer_email: 'm.sterling@kingsman.royal',
-        district: 'Dhaka - Inside City',
-        area: 'Manhattan',
-        city: 'New York',
-        address: '450 Park Avenue, Penthouse B',
-        notes: 'Please leave with private doorman.',
-        payment_method: 'SSLCommerz/Card',
-        payment_status: 'Paid',
-        order_status: 'Packaging',
-        subtotal: 680,
-        discount_amount: 0,
-        shipping_fee: 0,
-        total: 680,
-        currency: 'USD',
-        tracking_number: 'TRK-KNG-992031',
-      }, { onConflict: 'id' });
-
-      await supabaseClient.from('order_items').insert({
-        order_id: 'KNG-2026-8942',
-        product_id: INITIAL_PRODUCTS[0]?.id || 'kng-001',
-        product_name: INITIAL_PRODUCTS[0]?.name || 'KINGSMAN Sovereign Crimson I',
-        selected_size: 42,
-        selected_color: 'Royal Crimson & Gold',
-        unit_price: 680,
-        quantity: 1,
-        total_price: 680,
-      });
-
-      console.log('✅ [SUPABASE SEED] Database seeded successfully with products, sizes, coupons, and sample order.');
+      console.log('✅ [SUPABASE SEED] Database seeded successfully with authentic products, sizes, and coupons.');
     }
   } catch (err: any) {
     console.warn('⚠️ [SUPABASE SEED] Exception during database seeding:', err.message);
@@ -486,7 +436,13 @@ export const dbOrders = {
           discountAmount: Number(row.discount_amount || 0),
           shippingFee: Number(row.shipping_fee || 0),
           total: Number(row.total),
-          currency: row.currency || 'USD',
+          currency: (row.currency || 'BDT') as any,
+          advanceDeliveryFeePaid: Boolean(row.advance_delivery_fee_paid),
+          advanceDeliveryFeeTrxId: row.advance_delivery_fee_trx_id || undefined,
+          advanceDeliveryFeeMethod: row.advance_delivery_fee_method || undefined,
+          remainingAmountDue: row.remaining_amount_due !== undefined ? Number(row.remaining_amount_due) : undefined,
+          courierPartner: row.courier_partner || 'Steadfast',
+          idempotencyKey: row.idempotency_key || undefined,
           createdAt: row.created_at,
           trackingNumber: row.tracking_number,
         };
@@ -501,6 +457,47 @@ export const dbOrders = {
     if (!supabaseClient) return null;
 
     try {
+      // 0. Idempotency Check
+      if (orderData.idempotencyKey) {
+        const { data: existingOrder } = await supabaseClient
+          .from('orders')
+          .select('*, order_items(*)')
+          .eq('idempotency_key', orderData.idempotencyKey)
+          .maybeSingle();
+
+        if (existingOrder) {
+          console.log(`ℹ️ [SUPABASE IDEMPOTENCY] Order with key ${orderData.idempotencyKey} already exists (${existingOrder.id}).`);
+          return {
+            id: existingOrder.id,
+            idempotencyKey: existingOrder.idempotency_key,
+            customerName: existingOrder.customer_name,
+            customerPhone: existingOrder.customer_phone,
+            customerEmail: existingOrder.customer_email || undefined,
+            district: existingOrder.district,
+            area: existingOrder.area,
+            city: existingOrder.city,
+            address: existingOrder.address,
+            notes: existingOrder.notes || undefined,
+            paymentMethod: existingOrder.payment_method as any,
+            paymentStatus: existingOrder.payment_status as any,
+            orderStatus: existingOrder.order_status as any,
+            items: orderData.items || [],
+            subtotal: Number(existingOrder.subtotal),
+            discountAmount: Number(existingOrder.discount_amount || 0),
+            shippingFee: Number(existingOrder.shipping_fee || 0),
+            total: Number(existingOrder.total),
+            currency: 'BDT',
+            advanceDeliveryFeePaid: Boolean(existingOrder.advance_delivery_fee_paid),
+            advanceDeliveryFeeTrxId: existingOrder.advance_delivery_fee_trx_id || undefined,
+            advanceDeliveryFeeMethod: existingOrder.advance_delivery_fee_method || undefined,
+            remainingAmountDue: Number(existingOrder.remaining_amount_due || 0),
+            courierPartner: existingOrder.courier_partner || 'Steadfast',
+            createdAt: existingOrder.created_at,
+            trackingNumber: existingOrder.tracking_number,
+          };
+        }
+      }
+
       const randomSuffix = Math.floor(1000 + Math.random() * 9000);
       const orderId = orderData.id || `KNG-${new Date().getFullYear()}-${randomSuffix}`;
       const trackingNumber = orderData.trackingNumber || `TRK-KNG-${Math.floor(100000 + Math.random() * 900000)}`;
@@ -509,7 +506,7 @@ export const dbOrders = {
       if (orderData.customerPhone) {
         await supabaseClient.from('customers').upsert(
           {
-            full_name: orderData.customerName || 'Valued Guest',
+            full_name: orderData.customerName || 'Valued Customer',
             phone: orderData.customerPhone,
             email: orderData.customerEmail || null,
             district: orderData.district || 'Dhaka',
@@ -521,9 +518,14 @@ export const dbOrders = {
       }
 
       // 2. Insert into `orders` table
+      const isCod = orderData.paymentMethod === 'COD';
+      const advancePaid = Boolean(orderData.advanceDeliveryFeePaid || !isCod);
+      const remainingDue = orderData.remainingAmountDue ?? (isCod ? Math.max(0, (orderData.total || 0) - (orderData.shippingFee || 100)) : 0);
+
       const orderRow = {
         id: orderId,
-        customer_name: orderData.customerName || 'Valued Guest',
+        idempotency_key: orderData.idempotencyKey || null,
+        customer_name: orderData.customerName || 'Valued Customer',
         customer_phone: orderData.customerPhone || 'N/A',
         customer_email: orderData.customerEmail || null,
         district: orderData.district || orderData.city || 'Dhaka',
@@ -532,13 +534,18 @@ export const dbOrders = {
         address: orderData.address || '',
         notes: orderData.notes || null,
         payment_method: orderData.paymentMethod || 'COD',
-        payment_status: orderData.paymentMethod === 'COD' ? 'Due' : (orderData.paymentStatus || 'Pending'),
+        payment_status: orderData.paymentStatus || (isCod ? (advancePaid ? 'Delivery Fee Paid' : 'Due') : 'Pending'),
         order_status: 'Pending',
         subtotal: orderData.subtotal || 0,
         discount_amount: orderData.discountAmount || 0,
-        shipping_fee: orderData.shippingFee || 0,
+        shipping_fee: orderData.shippingFee || 100,
         total: orderData.total || 0,
-        currency: orderData.currency || 'USD',
+        currency: 'BDT',
+        advance_delivery_fee_paid: advancePaid,
+        advance_delivery_fee_trx_id: orderData.advanceDeliveryFeeTrxId || null,
+        advance_delivery_fee_method: orderData.advanceDeliveryFeeMethod || null,
+        remaining_amount_due: remainingDue,
+        courier_partner: orderData.courierPartner || 'Steadfast',
         tracking_number: trackingNumber,
       };
 
@@ -548,7 +555,7 @@ export const dbOrders = {
         throw orderErr;
       }
 
-      // 3. Insert into `order_items` & Decrement Stock in `product_sizes` + `products`
+      // 3. Insert into `order_items` & Atomic Stock Decrement
       const items = orderData.items || [];
       if (items.length > 0) {
         const orderItemRows = items.map(item => ({
@@ -567,78 +574,57 @@ export const dbOrders = {
           console.warn('⚠️ [SUPABASE] Error inserting order_items:', itemErr.message);
         }
 
-        // 4. Decrement Stock per size and log to inventory_logs
-        for (const item of items) {
-          try {
-            // Get current size stock
-            const { data: sizeRow } = await supabaseClient
-              .from('product_sizes')
-              .select('stock_quantity')
-              .eq('product_id', item.product.id)
-              .eq('size_eu', item.selectedSize)
-              .maybeSingle();
+        // Try calling atomic decrement RPC first
+        const rpcPayload = items.map(i => ({
+          product_id: i.product.id,
+          size_eu: i.selectedSize,
+          quantity: i.quantity,
+        }));
 
-            const currentQty = sizeRow ? sizeRow.stock_quantity : 5;
-            const newQty = Math.max(0, currentQty - item.quantity);
+        const { error: rpcErr } = await supabaseClient.rpc('decrement_stock_atomic', {
+          p_order_items: rpcPayload,
+        });
 
-            await supabaseClient
-              .from('product_sizes')
-              .upsert(
-                {
-                  product_id: item.product.id,
-                  size_eu: item.selectedSize,
-                  stock_quantity: newQty,
-                  is_active: true,
-                },
-                { onConflict: 'product_id,size_eu' }
-              );
+        if (rpcErr) {
+          // If RPC is not yet created on Supabase project, execute resilient direct update
+          for (const item of items) {
+            try {
+              const { data: sizeRow } = await supabaseClient
+                .from('product_sizes')
+                .select('stock_quantity')
+                .eq('product_id', item.product.id)
+                .eq('size_eu', item.selectedSize)
+                .maybeSingle();
 
-            // Log to inventory_logs
-            await supabaseClient.from('inventory_logs').insert({
-              product_id: item.product.id,
-              size_eu: item.selectedSize,
-              previous_stock: currentQty,
-              new_stock: newQty,
-              change_reason: 'Sale',
-              admin_user: `Online Order #${orderId}`,
-            });
+              const currentQty = sizeRow ? sizeRow.stock_quantity : 5;
+              const newQty = Math.max(0, currentQty - item.quantity);
 
-            // Decrement total product stock
-            const { data: prodRow } = await supabaseClient
-              .from('products')
-              .select('stock')
-              .eq('id', item.product.id)
-              .maybeSingle();
+              await supabaseClient
+                .from('product_sizes')
+                .upsert(
+                  {
+                    product_id: item.product.id,
+                    size_eu: item.selectedSize,
+                    stock_quantity: newQty,
+                    is_active: true,
+                  },
+                  { onConflict: 'product_id,size_eu' }
+                );
 
-            if (prodRow) {
               await supabaseClient
                 .from('products')
-                .update({ stock: Math.max(0, prodRow.stock - item.quantity) })
+                .update({ stock: Math.max(0, (item.product.stock || 10) - item.quantity) })
                 .eq('id', item.product.id);
+            } catch (stkErr: any) {
+              console.warn(`⚠️ [SUPABASE] Stock update error for ${item.product.id}:`, stkErr.message);
             }
-          } catch (stkErr: any) {
-            console.warn(`⚠️ [SUPABASE] Stock decrement error for ${item.product.id}:`, stkErr.message);
           }
         }
       }
 
-      // 5. Insert Payment record into `payments` table
-      try {
-        await supabaseClient.from('payments').insert({
-          order_id: orderId,
-          payment_method: orderData.paymentMethod || 'COD',
-          transaction_id: orderData.paymentDetails?.transactionId || `TXN-${Math.floor(10000000 + Math.random() * 90000000)}`,
-          mfs_phone: orderData.paymentDetails?.mfsPhone || null,
-          card_last4: orderData.paymentDetails?.cardLast4 || null,
-          amount: orderData.total || 0,
-          status: orderData.paymentMethod === 'COD' ? 'Pending' : 'Success',
-        });
-      } catch (payErr: any) {
-        console.warn('⚠️ [SUPABASE] Error recording payment:', payErr.message);
-      }
-
       const createdOrder: Order = {
         id: orderId,
+        idempotencyKey: orderData.idempotencyKey,
         customerName: orderRow.customer_name,
         customerPhone: orderRow.customer_phone,
         customerEmail: orderRow.customer_email || undefined,
@@ -655,13 +641,18 @@ export const dbOrders = {
         discountAmount: orderRow.discount_amount,
         shippingFee: orderRow.shipping_fee,
         total: orderRow.total,
-        currency: orderRow.currency as any,
+        currency: 'BDT',
+        advanceDeliveryFeePaid: orderRow.advance_delivery_fee_paid,
+        advanceDeliveryFeeTrxId: orderRow.advance_delivery_fee_trx_id || undefined,
+        advanceDeliveryFeeMethod: (orderRow.advance_delivery_fee_method as any) || undefined,
+        remainingAmountDue: orderRow.remaining_amount_due,
+        courierPartner: orderRow.courier_partner as any,
         createdAt: new Date().toISOString(),
         trackingNumber: trackingNumber,
         paymentDetails: orderData.paymentDetails,
       };
 
-      console.log(`✅ [SUPABASE] Order created: ${orderId} (${orderRow.customer_name}) - Total: $${orderRow.total}`);
+      console.log(`✅ [SUPABASE] Order created: ${orderId} (${orderRow.customer_name}) - Total: ৳${orderRow.total}`);
       return createdOrder;
     } catch (err: any) {
       console.warn('⚠️ [SUPABASE] Exception in dbOrders.create:', err.message);

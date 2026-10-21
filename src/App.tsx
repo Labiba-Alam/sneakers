@@ -36,6 +36,7 @@ const OrderConfirmationModal = lazy(() => import('./components/OrderConfirmation
 const OrderTrackingModal = lazy(() => import('./components/OrderTrackingModal').then(m => ({ default: m.OrderTrackingModal })));
 const WishlistView = lazy(() => import('./components/WishlistView').then(m => ({ default: m.WishlistView })));
 const ContactView = lazy(() => import('./components/ContactView').then(m => ({ default: m.ContactView })));
+const PolicyView = lazy(() => import('./components/legal/PolicyModals').then(m => ({ default: m.PolicyView })));
 
 const SuspenseFallback: React.FC = () => (
   <div className="min-h-[50vh] flex flex-col items-center justify-center p-8 bg-[#0D0D0D]">
@@ -116,6 +117,12 @@ const MainContent: React.FC = () => {
         {view === 'wishlist' && (
           <Suspense fallback={<SuspenseFallback />}>
             <WishlistView />
+          </Suspense>
+        )}
+
+        {['shipping-policy', 'refund-policy', 'terms', 'privacy-policy'].includes(view) && (
+          <Suspense fallback={<SuspenseFallback />}>
+            <PolicyView view={view} onClose={() => setView('home')} />
           </Suspense>
         )}
       </ResponsiveLayout>

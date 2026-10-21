@@ -17,6 +17,7 @@ import {
   dbCoupons,
   dbInventoryLogs,
 } from "./src/server/supabase";
+import { parseProductCatalogCSV } from "./src/server/catalogImport";
 
 // Initialize Supabase & Run Seeder if connected
 initSupabase();
@@ -24,39 +25,7 @@ seedSupabaseIfEmpty();
 
 // In-memory backend storage with initial seed as fallback
 let productsStore: Product[] = [...INITIAL_PRODUCTS];
-let ordersStore: Order[] = [
-  {
-    id: 'KNG-2026-8942',
-    customerName: 'Marcus Sterling',
-    customerPhone: '+1 555-019-2834',
-    customerEmail: 'm.sterling@kingsman.royal',
-    district: 'Dhaka - Inside City',
-    address: '450 Park Avenue, Penthouse B',
-    area: 'Manhattan',
-    city: 'New York',
-    notes: 'Please leave with private doorman.',
-    paymentMethod: 'SSLCommerz/Card',
-    paymentStatus: 'Paid',
-    orderStatus: 'Packaging',
-    items: [
-      {
-        id: 'kng-001-42-Royal Crimson & Gold',
-        product: INITIAL_PRODUCTS[0],
-        selectedSize: 42,
-        selectedColor: { name: 'Royal Crimson & Gold', hex: '#C1121F' },
-        quantity: 1
-      }
-    ],
-    subtotal: 680,
-    discountAmount: 0,
-    shippingFee: 0,
-    total: 680,
-    currency: 'USD',
-    createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-    trackingNumber: 'TRK-KNG-992031'
-  }
-];
-
+let ordersStore: Order[] = [];
 let couponsStore: Coupon[] = [...INITIAL_COUPONS];
 let inventoryLogsStore: InventoryLog[] = [
   {
@@ -376,6 +345,39 @@ Format your response in sleek, professional, bulleted executive recommendations.
     res.json(ordersStore);
   });
 
+  // PROTECTED ADMIN BATCH IMPORT CATALOG FROM CSV
+  app.post("/api/admin/catalog/import-csv", requireAdminAuth, async (req, res) => {
+    const { csvContent } = req.body;
+    if (!csvContent || typeof csvContent !== 'string') {
+      return res.status(400).json({ error: "Missing or invalid csvContent in request body" });
+    }
+
+    const result = parseProductCatalogCSV(csvContent);
+    if (!result.valid) {
+      return res.status(400).json({
+        error: "CSV validation failed",
+        errors: result.errors,
+      });
+    }
+
+    // Merge into products store
+    result.products.forEach(newProd => {
+      const idx = productsStore.findIndex(p => p.sku === newProd.sku || p.id === newProd.id);
+      if (idx !== -1) {
+        productsStore[idx] = newProd;
+      } else {
+        productsStore.push(newProd);
+      }
+    });
+
+    console.log(`📦 [CATALOG IMPORT] Successfully parsed and imported ${result.products.length} products.`);
+    res.json({
+      success: true,
+      message: `Successfully imported ${result.products.length} products with ${result.totalSizesCount} size inventories.`,
+      products: result.products,
+    });
+  });
+
   // PROTECTED ADMIN UPDATE ORDER STATUS
   app.put(["/api/admin/orders/:id/status", "/api/orders/:id/status"], requireAdminAuth, async (req, res) => {
     const { id } = req.params;
@@ -610,7 +612,7 @@ Format your response in sleek, professional, bulleted executive recommendations.
           date: order.createdAt || new Date().toISOString(),
 
           // Customer & location details
-          customerName: order.customerName || 'Guest',
+          customerName: order.customerName || 'Customer',
           phone: order.customerPhone || '',
           customerPhone: order.customerPhone || '',
           customerEmail: order.customerEmail || '',
@@ -627,14 +629,21 @@ Format your response in sleek, professional, bulleted executive recommendations.
           quantity: totalQty,
           totalQuantity: totalQty,
 
-          // Financial breakdown
+          // Financial breakdown in BDT
           subtotal: order.subtotal || 0,
-          shippingFee: order.shippingFee || 0,
-          deliveryFee: order.shippingFee || 0,
+          shippingFee: order.shippingFee || 100,
+          deliveryFee: order.shippingFee || 100,
           discount: order.discountAmount || 0,
           discountAmount: order.discountAmount || 0,
           total: order.total || 0,
-          currency: order.currency || 'USD',
+          currency: 'BDT',
+
+          // Advance Delivery Fee & Courier Partner
+          advanceDeliveryFeePaid: order.advanceDeliveryFeePaid || false,
+          advanceDeliveryFeeTrxId: order.advanceDeliveryFeeTrxId || '',
+          advanceDeliveryFeeMethod: order.advanceDeliveryFeeMethod || '',
+          remainingAmountDue: order.remainingAmountDue || 0,
+          courierPartner: order.courierPartner || 'Steadfast',
 
           // Payment & order lifecycle
           paymentMethod: order.paymentMethod || 'COD',
@@ -670,6 +679,96 @@ Format your response in sleek, professional, bulleted executive recommendations.
     })();
   }
 
+  /**
+   * Dispatches transactional confirmation emails via Resend API (Customer + Store Owner).
+   */
+  async function sendOrderNotificationEmail(order: Order): Promise<void> {
+    const resendApiKey = process.env.RESEND_API_KEY;
+    if (!resendApiKey || !resendApiKey.startsWith('re_')) {
+      console.log(`📧 [EMAIL LOG] Order notification queued for ${order.customerName} (${order.customerEmail || order.customerPhone}) - Total: ৳${order.total}`);
+      return;
+    }
+
+    try {
+      const itemsListHtml = (order.items || []).map(item => `
+        <tr>
+          <td style="padding: 8px; border-bottom: 1px solid #222;">${item.product?.name || 'Sneaker'} (EU ${item.selectedSize})</td>
+          <td style="padding: 8px; border-bottom: 1px solid #222; text-align: center;">${item.quantity}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #222; text-align: right;">৳${(item.product?.price || 0) * item.quantity}</td>
+        </tr>
+      `).join('');
+
+      // Send Customer Receipt if email provided
+      if (order.customerEmail) {
+        await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${resendApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            from: 'KINGSMAN Luxury Sneakers <orders@kingsmanszn.com>',
+            to: [order.customerEmail],
+            subject: `Order Confirmed: #${order.id} - KINGSMAN`,
+            html: `
+              <div style="font-family: sans-serif; background: #111; color: #f8f8f8; padding: 24px; max-width: 600px;">
+                <h1 style="color: #c7a55b; letter-spacing: 2px;">KINGSMAN LUXURY SNEAKERS</h1>
+                <p>Dear ${order.customerName},</p>
+                <p>Thank you for your order. We are preparing your curated sneakers for dispatch.</p>
+                <div style="background: #181818; padding: 16px; margin: 16px 0; border: 1px solid #333;">
+                  <p><strong>Order ID:</strong> ${order.id}</p>
+                  <p><strong>Delivery Fee Paid:</strong> ৳${order.shippingFee}</p>
+                  <p><strong>Remaining Balance Due on Delivery:</strong> ৳${order.remainingAmountDue || 0}</p>
+                  <p><strong>Courier:</strong> ${order.courierPartner || 'Steadfast'} Express</p>
+                </div>
+                <table style="width: 100%; border-collapse: collapse; margin-top: 16px;">
+                  <thead>
+                    <tr style="color: #c7a55b; border-bottom: 1px solid #444;">
+                      <th style="text-align: left; padding: 8px;">Product</th>
+                      <th style="text-align: center; padding: 8px;">Qty</th>
+                      <th style="text-align: right; padding: 8px;">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>${itemsListHtml}</tbody>
+                </table>
+                <p style="margin-top: 24px; font-size: 12px; color: #888;">
+                  For any inquiries, contact WhatsApp: 01581054939 or email kingsmanszn@gmail.com.
+                </p>
+              </div>
+            `,
+          }),
+        });
+      }
+
+      // Send Store Owner Instant Alert
+      await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${resendApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: 'KINGSMAN Alert <alerts@kingsmanszn.com>',
+          to: ['kingsmanszn@gmail.com'],
+          subject: `🚨 New Order #${order.id}: ৳${order.total} (${order.customerName})`,
+          html: `
+            <div style="font-family: sans-serif; padding: 16px;">
+              <h2>New KINGSMAN Order Received</h2>
+              <p><strong>Customer:</strong> ${order.customerName} (${order.customerPhone})</p>
+              <p><strong>Address:</strong> ${order.address}, ${order.area}, ${order.district}</p>
+              <p><strong>Payment Method:</strong> ${order.paymentMethod}</p>
+              <p><strong>Advance Delivery Fee:</strong> ৳${order.shippingFee} (TrxID: ${order.advanceDeliveryFeeTrxId || 'N/A'})</p>
+              <p><strong>Remaining Due on Delivery:</strong> ৳${order.remainingAmountDue || 0}</p>
+              <p><strong>Courier Partner:</strong> ${order.courierPartner || 'Steadfast'}</p>
+            </div>
+          `,
+        }),
+      });
+    } catch (emailErr: any) {
+      console.warn('⚠️ [EMAIL DISPATCH] Failed to send email via Resend:', emailErr?.message || emailErr);
+    }
+  }
+
   // POST ORDER (CHECKOUT) - Supabase Transactional Insert & Stock Decrement
   app.post("/api/orders", async (req, res) => {
     const orderData = req.body;
@@ -691,17 +790,32 @@ Format your response in sleek, professional, bulleted executive recommendations.
       // Fire-and-forget sync to Google Sheets webhook
       syncOrderToGoogleSheets(dbCreatedOrder);
 
+      // Fire-and-forget notification emails
+      sendOrderNotificationEmail(dbCreatedOrder);
+
       return res.status(201).json({
         success: true,
-        message: "Royal order placed successfully",
+        message: "Order placed successfully",
         order: dbCreatedOrder
       });
     }
 
     // Fallback to in-memory order creation
+    if (orderData.idempotencyKey) {
+      const existing = ordersStore.find(o => o.idempotencyKey && o.idempotencyKey === orderData.idempotencyKey);
+      if (existing) {
+        return res.status(200).json({
+          success: true,
+          message: "Order already placed",
+          order: existing
+        });
+      }
+    }
+
     const randomSuffix = Math.floor(1000 + Math.random() * 9000);
     const newOrder: Order = {
-      id: `KNG-${new Date().getFullYear()}-${randomSuffix}`,
+      id: orderData.id || `KNG-${new Date().getFullYear()}-${randomSuffix}`,
+      idempotencyKey: orderData.idempotencyKey,
       customerName: orderData.customerName,
       customerPhone: orderData.customerPhone,
       customerEmail: orderData.customerEmail,
@@ -711,24 +825,32 @@ Format your response in sleek, professional, bulleted executive recommendations.
       city: orderData.city,
       notes: orderData.notes,
       paymentMethod: orderData.paymentMethod,
-      paymentStatus: orderData.paymentMethod === 'COD' ? 'Due' : (orderData.paymentStatus || 'Pending'),
-      orderStatus: 'Pending',
+      paymentStatus: orderData.paymentStatus || (orderData.paymentMethod === 'COD' ? 'Delivery Fee Paid' : 'Pending'),
+      orderStatus: 'Confirmed',
       items: orderData.items,
       subtotal: orderData.subtotal,
       discountAmount: orderData.discountAmount || 0,
-      shippingFee: orderData.shippingFee || 0,
+      shippingFee: orderData.shippingFee || 100,
       total: orderData.total,
-      currency: orderData.currency || 'USD',
+      currency: 'BDT',
+      advanceDeliveryFeePaid: Boolean(orderData.advanceDeliveryFeePaid),
+      advanceDeliveryFeeTrxId: orderData.advanceDeliveryFeeTrxId,
+      advanceDeliveryFeeMethod: orderData.advanceDeliveryFeeMethod,
+      remainingAmountDue: orderData.remainingAmountDue,
+      courierPartner: orderData.courierPartner || 'Steadfast',
       createdAt: new Date().toISOString(),
       trackingNumber: `TRK-KNG-${Math.floor(100000 + Math.random() * 900000)}`,
       paymentDetails: orderData.paymentDetails
     };
 
-    // Deduct stock
+    // Deduct stock in memory
     orderData.items?.forEach((item: any) => {
       const product = productsStore.find(p => p.id === item.product.id);
       if (product) {
         product.stock = Math.max(0, product.stock - item.quantity);
+        if (product.sizeStock && item.selectedSize) {
+          product.sizeStock[item.selectedSize] = Math.max(0, (product.sizeStock[item.selectedSize] || 5) - item.quantity);
+        }
       }
     });
 
@@ -737,11 +859,14 @@ Format your response in sleek, professional, bulleted executive recommendations.
     // Fire-and-forget sync to Google Sheets webhook
     syncOrderToGoogleSheets(newOrder);
 
-    console.log(`[ORDER LOG] Fallback stored order ${newOrder.id} for ${newOrder.customerName} - Total: $${newOrder.total}`);
+    // Fire-and-forget email alerts
+    sendOrderNotificationEmail(newOrder);
+
+    console.log(`[ORDER LOG] Stored order ${newOrder.id} for ${newOrder.customerName} - Total: ৳${newOrder.total}`);
 
     res.status(201).json({
       success: true,
-      message: "Royal order placed successfully",
+      message: "Order placed successfully",
       order: newOrder
     });
   });

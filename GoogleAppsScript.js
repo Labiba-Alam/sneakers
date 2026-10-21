@@ -21,7 +21,7 @@ function doPost(e) {
     if (sheet.getLastRow() === 0) {
       sheet.appendRow([
         "Order ID",
-        "Date",
+        "Date (Dhaka)",
         "Customer Name",
         "Phone",
         "District",
@@ -30,19 +30,21 @@ function doPost(e) {
         "Products",
         "Sizes",
         "Quantity",
-        "Subtotal",
-        "Delivery Fee",
-        "Discount",
-        "Grand Total",
+        "Subtotal (BDT)",
+        "Advance Delivery Fee (BDT)",
+        "Advance TrxID / Method",
+        "Remaining Due on Delivery (BDT)",
+        "Grand Total (BDT)",
         "Payment Method",
         "Payment Status",
+        "Courier Partner",
         "Order Status",
-        "Delivery Status",
-        "Notes"
+        "Tracking Number",
+        "Customer Notes"
       ]);
       
       // Style header
-      var headerRange = sheet.getRange(1, 1, 1, 19);
+      var headerRange = sheet.getRange(1, 1, 1, 21);
       headerRange.setBackground("#111111");
       headerRange.setFontColor("#C7A55B");
       headerRange.setFontWeight("bold");
@@ -63,8 +65,12 @@ function doPost(e) {
       });
     }
 
+    var advanceInfo = data.advanceDeliveryFeeTrxId 
+      ? (data.advanceDeliveryFeeMethod || 'MFS') + " (" + data.advanceDeliveryFeeTrxId + ")"
+      : (data.advanceDeliveryFeePaid ? "Paid Online" : "Pending Verification");
+
     var newRow = [
-      data.id || "KSM-ORDER",
+      data.id || "KNG-ORDER",
       new Date().toLocaleString("en-US", { timeZone: "Asia/Dhaka" }),
       data.customerName || "Guest",
       data.customerPhone || "",
@@ -75,13 +81,15 @@ function doPost(e) {
       productSizes.join(" | "),
       totalQty,
       data.subtotal || 0,
-      data.shippingFee || 0,
-      data.discountAmount || 0,
+      data.shippingFee || (data.district && data.district.indexOf('Inside City') !== -1 ? 100 : 160),
+      advanceInfo,
+      data.remainingAmountDue || 0,
       data.total || 0,
       data.paymentMethod || "COD",
       data.paymentStatus || "Pending",
+      data.courierPartner || "Steadfast",
       data.orderStatus || "Pending",
-      data.orderStatus === "Delivered" ? "Delivered" : "In Transit",
+      data.trackingNumber || "",
       data.notes || ""
     ];
 

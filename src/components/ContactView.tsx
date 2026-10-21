@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Phone, MapPin, Clock, MessageSquare, Send, Sparkles, ShieldCheck } from 'lucide-react';
+import { Mail, Phone, MapPin, Clock, MessageSquare, Send, Sparkles, ShieldCheck, ExternalLink } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 
 export const ContactView: React.FC = () => {
@@ -8,7 +8,7 @@ export const ContactView: React.FC = () => {
     name: '',
     phone: '',
     email: '',
-    subject: 'Bespoke Sizing & Consultation',
+    subject: 'Sneaker Sizing & Order Inquiry',
     message: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -18,9 +18,9 @@ export const ContactView: React.FC = () => {
     setIsSubmitting(true);
     setTimeout(() => {
       setIsSubmitting(false);
-      showToast('Thank you. A KINGSMAN Concierge will contact you within 2 hours.', 'success');
-      setFormData({ name: '', phone: '', email: '', subject: 'Bespoke Sizing & Consultation', message: '' });
-    }, 800);
+      showToast('Thank you for reaching out. A KINGSMAN representative will reply via WhatsApp or email shortly.', 'success');
+      setFormData({ name: '', phone: '', email: '', subject: 'Sneaker Sizing & Order Inquiry', message: '' });
+    }, 600);
   };
 
   return (
@@ -31,55 +31,129 @@ export const ContactView: React.FC = () => {
         <div className="text-center max-w-2xl mx-auto mb-16 space-y-3">
           <div className="inline-flex items-center gap-2 text-[#C7A55B] text-xs font-bold uppercase tracking-[0.25em]">
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Private Client Services</span>
+            <span>Customer Care & Concierge</span>
           </div>
           <h1 className="font-royal text-3xl sm:text-4xl font-black text-white tracking-wider">
-            ATELIER CONCIERGE & SHOWROOMS
+            CONTACT KINGSMAN
           </h1>
           <p className="text-xs text-white/60 leading-relaxed">
-            Our royal sneaker specialists in Dhaka and Chattogram are at your service for appointments, order inquiries, and bespoke fittings.
+            Need guidance on unisex sizing, advance delivery fees, or tracking a Steadfast / Pathao parcel? Our Dhaka team is ready to assist you.
           </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
           
-          {/* Left Column: Flagship Showroom Locations & Direct Lines */}
+          {/* Left Column: Official Contact Channels */}
           <div className="lg:col-span-5 space-y-6">
             
-            {/* Dhanmondi Atelier Flagship */}
-            <div className="p-6 bg-[#141414] border border-[#C7A55B]/30 space-y-3">
-              <div className="flex items-center gap-2 text-[#C7A55B] text-xs font-bold uppercase tracking-wider">
-                <MapPin className="w-4 h-4" />
-                <span>Dhanmondi Atelier Flagship</span>
+            {/* Direct WhatsApp Channel */}
+            <div className="p-6 bg-[#141414] border border-[#25D366]/40 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-[#25D366] text-xs font-bold uppercase tracking-wider">
+                  <MessageSquare className="w-4 h-4" />
+                  <span>Instant WhatsApp Support</span>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 bg-[#25D366]/20 text-[#25D366] font-bold rounded">
+                  Fastest Response
+                </span>
               </div>
-              <h3 className="font-royal text-lg font-bold text-white">House 42, Road 7/A, Dhanmondi R/A</h3>
-              <p className="text-xs text-white/60">Dhaka-1209, Bangladesh</p>
-              <div className="pt-2 text-xs text-white/70 space-y-1">
-                <p className="flex items-center gap-2"><Clock className="w-3.5 h-3.5 text-white/40" /> 10:00 AM – 9:30 PM (7 Days a Week)</p>
-                <p className="flex items-center gap-2"><Phone className="w-3.5 h-3.5 text-white/40" /> +880 1711-234567 (VIP Concierge)</p>
+              <h3 className="font-royal text-xl font-bold text-white tracking-wide">01581054939</h3>
+              <p className="text-xs text-white/60">
+                Direct chat with our sneaker stylists for live size advice, video inspects, and payment confirmation.
+              </p>
+              <div className="pt-2">
+                <a
+                  href="https://wa.me/8801581054939"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-xs font-bold text-[#25D366] hover:underline"
+                >
+                  <span>Open WhatsApp Chat</span>
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </a>
               </div>
             </div>
 
-            {/* Gulshan VIP Salon */}
+            {/* Official Support Email */}
+            <div className="p-6 bg-[#141414] border border-white/10 space-y-3">
+              <div className="flex items-center gap-2 text-[#C7A55B] text-xs font-bold uppercase tracking-wider">
+                <Mail className="w-4 h-4" />
+                <span>Official Email Inquiries</span>
+              </div>
+              <h3 className="font-royal text-lg font-bold text-white">kingsmanszn@gmail.com</h3>
+              <p className="text-xs text-white/60">
+                For order receipts, corporate partnerships, and refund queries.
+              </p>
+              <p className="text-[11px] text-white/50 flex items-center gap-2">
+                <Clock className="w-3.5 h-3.5 text-white/40" />
+                <span>Responses within 2 to 6 business hours</span>
+              </p>
+            </div>
+
+            {/* Corporate & Dispatch Office (Online Only - No Showroom) */}
             <div className="p-6 bg-[#141414] border border-white/10 space-y-3">
               <div className="flex items-center gap-2 text-[#C7A55B] text-xs font-bold uppercase tracking-wider">
                 <MapPin className="w-4 h-4" />
-                <span>Gulshan-2 Private Salon</span>
+                <span>Corporate Operations & Dispatch Office</span>
               </div>
-              <h3 className="font-royal text-lg font-bold text-white">Avenue 104, Gulshan-2 Commercial Zone</h3>
-              <p className="text-xs text-white/60">Dhaka-1212, Bangladesh</p>
-              <div className="pt-2 text-xs text-white/70 space-y-1">
-                <p className="flex items-center gap-2"><Clock className="w-3.5 h-3.5 text-white/40" /> 11:00 AM – 9:00 PM (By Appointment)</p>
-                <p className="flex items-center gap-2"><Phone className="w-3.5 h-3.5 text-white/40" /> +880 1819-987654 (Appointment Line)</p>
+              <h3 className="font-royal text-base font-bold text-white leading-snug">
+                House 44, Road 3, Block B, Mirpur 12
+              </h3>
+              <p className="text-xs text-white/60">Dhaka-1216, Bangladesh</p>
+              <div className="p-2.5 bg-[#C1121F]/10 border border-[#C1121F]/30 text-[11px] text-[#C1121F] font-semibold">
+                ⚠️ Notice: Online store fulfillment & dispatch center only. Strictly no walk-in showroom.
               </div>
+              <p className="text-[11px] text-white/50 flex items-center gap-2 pt-1">
+                <Clock className="w-3.5 h-3.5 text-white/40" />
+                <span>Dispatch Hours: 10:00 AM – 8:00 PM (Saturday – Thursday)</span>
+              </p>
             </div>
 
-            {/* Digital Service Guarantees */}
-            <div className="p-4 bg-white/5 border border-white/10 flex items-center gap-3">
-              <ShieldCheck className="w-6 h-6 text-[#C7A55B] shrink-0" />
-              <div className="text-xs">
-                <p className="font-bold text-white uppercase tracking-wider">Direct WhatsApp Assistance</p>
-                <p className="text-white/60">Chat with a personal footwear stylist 24/7 at +880 1912-345678.</p>
+            {/* Official Social Media Channels */}
+            <div className="p-5 bg-white/5 border border-white/10 space-y-3">
+              <p className="text-[11px] uppercase tracking-wider font-bold text-white">
+                Official Brand Social Channels
+              </p>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <a
+                  href="https://www.facebook.com/Kingsmanszn/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2.5 bg-[#111111] border border-white/10 hover:border-[#C7A55B] flex items-center justify-between text-white/80 hover:text-white transition-all"
+                >
+                  <span>Facebook</span>
+                  <ExternalLink className="w-3 h-3 text-white/40" />
+                </a>
+
+                <a
+                  href="https://www.instagram.com/kingsmanszn"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2.5 bg-[#111111] border border-white/10 hover:border-[#C7A55B] flex items-center justify-between text-white/80 hover:text-white transition-all"
+                >
+                  <span>Instagram</span>
+                  <ExternalLink className="w-3 h-3 text-white/40" />
+                </a>
+
+                <a
+                  href="https://www.tiktok.com/@kingsmanszn"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2.5 bg-[#111111] border border-white/10 hover:border-[#C7A55B] flex items-center justify-between text-white/80 hover:text-white transition-all"
+                >
+                  <span>TikTok</span>
+                  <ExternalLink className="w-3 h-3 text-white/40" />
+                </a>
+
+                <a
+                  href="https://www.pinterest.com/kingsmanszn/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2.5 bg-[#111111] border border-white/10 hover:border-[#C7A55B] flex items-center justify-between text-white/80 hover:text-white transition-all"
+                >
+                  <span>Pinterest</span>
+                  <ExternalLink className="w-3 h-3 text-white/40" />
+                </a>
               </div>
             </div>
 
@@ -89,10 +163,10 @@ export const ContactView: React.FC = () => {
           <div className="lg:col-span-7 bg-[#141414] border border-white/10 p-8 space-y-6">
             <div>
               <h2 className="font-royal text-xl font-bold text-white mb-1">
-                DISPATCH A CONCIERGE MESSAGE
+                DISPATCH A MESSAGE TO KINGSMAN
               </h2>
               <p className="text-xs text-white/50">
-                Inquire about custom sizing, limited drops, or tracking inquiries.
+                Inquire about unisex sizing, limited drops, advance fee confirmation, or parcel tracking.
               </p>
             </div>
 
@@ -107,7 +181,7 @@ export const ContactView: React.FC = () => {
                     required
                     value={formData.name}
                     onChange={e => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Lord / Lady Sterling"
+                    placeholder="e.g. Tanvir Hossain"
                     className="w-full px-4 py-3 bg-[#111111] border border-white/15 text-white text-xs focus:outline-none focus:border-[#C7A55B]"
                   />
                 </div>
@@ -121,7 +195,7 @@ export const ContactView: React.FC = () => {
                     required
                     value={formData.phone}
                     onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                    placeholder="017XXXXXXXX"
+                    placeholder="01XXXXXXXXX"
                     className="w-full px-4 py-3 bg-[#111111] border border-white/15 text-white text-xs focus:outline-none focus:border-[#C7A55B]"
                   />
                 </div>
@@ -130,7 +204,7 @@ export const ContactView: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] uppercase font-bold text-white/70 block mb-1">
-                    Email Address
+                    Email Address <span className="text-white/40 text-[9px] lowercase">(optional)</span>
                   </label>
                   <input
                     type="email"
@@ -143,42 +217,47 @@ export const ContactView: React.FC = () => {
 
                 <div>
                   <label className="text-[10px] uppercase font-bold text-white/70 block mb-1">
-                    Subject / Topic
+                    Inquiry Subject
                   </label>
                   <select
                     value={formData.subject}
                     onChange={e => setFormData({ ...formData, subject: e.target.value })}
                     className="w-full px-4 py-3 bg-[#111111] border border-white/15 text-white text-xs focus:outline-none focus:border-[#C7A55B]"
                   >
-                    <option value="Bespoke Sizing & Consultation">Bespoke Sizing & Consultation</option>
-                    <option value="Order Tracking & Delivery Status">Order Tracking & Delivery Status</option>
-                    <option value="Private Showroom Appointment">Private Showroom Appointment</option>
-                    <option value="Corporate & VIP Inquiries">Corporate & VIP Inquiries</option>
+                    <option value="Sneaker Sizing & Order Inquiry">Sneaker Sizing & Fit Guidance</option>
+                    <option value="Advance Delivery Fee Confirmation">Advance Delivery Fee Confirmation</option>
+                    <option value="Steadfast / Pathao Parcel Tracking">Parcel Tracking (Steadfast / Pathao)</option>
+                    <option value="Exchange or Return Request">Defective / Incorrect Item (within 3 days)</option>
+                    <option value="Wholesale / Bulk Inquiry">Wholesale / Special Order</option>
                   </select>
                 </div>
               </div>
 
               <div>
                 <label className="text-[10px] uppercase font-bold text-white/70 block mb-1">
-                  Message <span className="text-[#C1121F]">*</span>
+                  Your Message <span className="text-[#C1121F]">*</span>
                 </label>
                 <textarea
-                  rows={4}
+                  rows={5}
                   required
                   value={formData.message}
                   onChange={e => setFormData({ ...formData, message: e.target.value })}
-                  placeholder="How can our concierge assist your footwear acquisition today?"
-                  className="w-full px-4 py-3 bg-[#111111] border border-white/15 text-white text-xs focus:outline-none focus:border-[#C7A55B]"
+                  placeholder="Tell us what you need assistance with..."
+                  className="w-full px-4 py-3 bg-[#111111] border border-white/15 text-white text-xs focus:outline-none focus:border-[#C7A55B] resize-none"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full py-4 bg-[#C1121F] hover:bg-[#a00f1a] text-white text-xs uppercase font-bold tracking-[0.2em] flex items-center justify-center gap-2 transition-all shadow-xl cursor-pointer disabled:opacity-50"
+                className="w-full py-4 bg-[#C1121F] hover:bg-[#a30f1a] text-white text-xs uppercase tracking-[0.2em] font-bold shadow-xl flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50"
               >
-                <Send className="w-4 h-4" />
-                <span>{isSubmitting ? 'Transmitting Request...' : 'Send to Atelier Concierge'}</span>
+                {isSubmitting ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4 text-white" />
+                )}
+                <span>Send Inquiry</span>
               </button>
             </form>
           </div>
