@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Heart, ShoppingBag, User } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
+import { MegaMenu } from './MegaMenu';
 
 export interface DesktopNavProps {
   onOpenSearch: () => void;
@@ -27,6 +28,7 @@ export const DesktopNav: React.FC<DesktopNavProps> = ({
   } = useStore();
 
   const [isScrolled, setIsScrolled] = useState(false);
+  const [isMegaMenuOpen, setIsMegaMenuOpen] = useState(false);
 
   // Monitor scroll for sticky transition to solid white & soft shadow
   useEffect(() => {
@@ -56,13 +58,63 @@ export const DesktopNav: React.FC<DesktopNavProps> = ({
     } catch {}
   };
 
-  const handleNavClick = (category?: string, targetView: any = 'catalog', isSale?: boolean) => {
-    if (isSale) {
-      setFilters(prev => ({ ...prev, category: 'Sale', isSaleOnly: true }));
-    } else if (category) {
-      setFilters(prev => ({ ...prev, category: category as any, isSaleOnly: false }));
-    } else if (targetView === 'catalog') {
-      setFilters(prev => ({ ...prev, category: 'All', isSaleOnly: false }));
+  const handleNavDepartment = (dept: 'Sneakers' | 'Clothing') => {
+    setFilters(prev => ({
+      ...prev,
+      department: dept,
+      category: 'All',
+      brand: 'All',
+      clothingType: 'All',
+      isSaleOnly: false,
+      isNewArrivalsOnly: false,
+    }));
+    setView('catalog');
+    try { window.history.pushState(null, '', '/shop'); } catch {}
+  };
+
+  const handleNavGender = (gender: 'Men' | 'Women') => {
+    setFilters(prev => ({
+      ...prev,
+      gender,
+      isSaleOnly: false,
+      isNewArrivalsOnly: false,
+    }));
+    setView('catalog');
+    try { window.history.pushState(null, '', '/shop'); } catch {}
+  };
+
+  const handleNavSale = () => {
+    setFilters(prev => ({
+      ...prev,
+      isSaleOnly: true,
+      isNewArrivalsOnly: false,
+    }));
+    setView('catalog');
+    try { window.history.pushState(null, '', '/shop'); } catch {}
+  };
+
+  const handleNavNewArrivals = () => {
+    setFilters(prev => ({
+      ...prev,
+      isNewArrivalsOnly: true,
+      isSaleOnly: false,
+    }));
+    setView('catalog');
+    try { window.history.pushState(null, '', '/shop'); } catch {}
+  };
+
+  const handleNavClick = (targetView: any = 'catalog') => {
+    if (targetView === 'catalog') {
+      setFilters(prev => ({
+        ...prev,
+        department: 'All',
+        category: 'All',
+        brand: 'All',
+        clothingType: 'All',
+        gender: 'All',
+        isSaleOnly: false,
+        isNewArrivalsOnly: false,
+      }));
     }
     setView(targetView);
     try {
@@ -72,10 +124,13 @@ export const DesktopNav: React.FC<DesktopNavProps> = ({
   };
 
   // Check active menu item
-  const isShopActive = view === 'catalog' && filters.category === 'All' && !filters.isSaleOnly;
-  const isMenActive = view === 'catalog' && filters.category === 'Men Sneakers';
-  const isWomenActive = view === 'catalog' && filters.category === 'Women Sneakers';
-  const isSaleActive = view === 'catalog' && (filters.category === 'Sale' || filters.isSaleOnly);
+  const isShopActive = view === 'catalog' && filters.department === 'All' && !filters.isSaleOnly && !filters.isNewArrivalsOnly && filters.gender === 'All';
+  const isSneakersActive = view === 'catalog' && filters.department === 'Sneakers';
+  const isClothingActive = view === 'catalog' && filters.department === 'Clothing';
+  const isNewArrivalsActive = view === 'catalog' && filters.isNewArrivalsOnly;
+  const isSaleActive = view === 'catalog' && filters.isSaleOnly;
+  const isMenActive = view === 'catalog' && filters.gender === 'Men';
+  const isWomenActive = view === 'catalog' && filters.gender === 'Women';
   const isAboutActive = view === 'brand-story';
   const isContactActive = view === 'contact';
 
@@ -122,34 +177,57 @@ export const DesktopNav: React.FC<DesktopNavProps> = ({
         {/* ========================================================================= */}
         <nav 
           aria-label="Main navigation" 
+          onMouseLeave={() => setIsMegaMenuOpen(false)}
           className="hidden md:flex items-center gap-2 lg:gap-3 xl:gap-5"
         >
-          {/* 1. Shop */}
+          {/* 1. Sneakers (Department + Mega Menu Trigger) */}
           <button
-            onClick={() => handleNavClick(undefined, 'catalog')}
-            className={`relative px-4 py-2 text-[16px] xl:text-[17px] font-medium tracking-tight transition-all rounded-md outline-none focus:outline-none focus-visible:outline-none focus-visible:opacity-80 group ${
-              isShopActive 
+            onClick={() => handleNavDepartment('Sneakers')}
+            onMouseEnter={() => setIsMegaMenuOpen(true)}
+            className={`relative px-3.5 py-2 text-[15px] xl:text-[16px] font-medium tracking-tight transition-all rounded-md outline-none focus:outline-none focus-visible:outline-none focus-visible:opacity-80 group ${
+              isSneakersActive 
                 ? 'text-[#C1121F] font-semibold' 
                 : 'text-[#111111]/80 hover:text-[#111111]'
             }`}
           >
             <span className="relative">
-              Shop
-              {/* Subtle hover underline */}
-              <span className={`absolute -bottom-1 left-0 w-0 h-[2px] bg-[#111111]/40 transition-all duration-200 group-hover:w-full ${isShopActive ? 'hidden' : ''}`} />
+              Sneakers
+              <span className={`absolute -bottom-1 left-0 w-0 h-[2px] bg-[#111111]/40 transition-all duration-200 group-hover:w-full ${isSneakersActive ? 'hidden' : ''}`} />
             </span>
-            {isShopActive && (
+            {isSneakersActive && (
               <motion.span 
                 layoutId="desktop-nav-underline"
-                className="absolute bottom-0 left-4 right-4 h-[2px] bg-[#C1121F] rounded-full"
+                className="absolute bottom-0 left-3.5 right-3.5 h-[2px] bg-[#C1121F] rounded-full"
               />
             )}
           </button>
 
-          {/* 2. Men */}
+          {/* 2. Clothing (Department + Mega Menu Trigger) */}
           <button
-            onClick={() => handleNavClick('Men Sneakers', 'catalog')}
-            className={`relative px-4 py-2 text-[16px] xl:text-[17px] font-medium tracking-tight transition-all rounded-md outline-none focus:outline-none focus-visible:outline-none focus-visible:opacity-80 group ${
+            onClick={() => handleNavDepartment('Clothing')}
+            onMouseEnter={() => setIsMegaMenuOpen(true)}
+            className={`relative px-3.5 py-2 text-[15px] xl:text-[16px] font-medium tracking-tight transition-all rounded-md outline-none focus:outline-none focus-visible:outline-none focus-visible:opacity-80 group ${
+              isClothingActive 
+                ? 'text-[#C1121F] font-semibold' 
+                : 'text-[#111111]/80 hover:text-[#111111]'
+            }`}
+          >
+            <span className="relative">
+              Clothing
+              <span className={`absolute -bottom-1 left-0 w-0 h-[2px] bg-[#111111]/40 transition-all duration-200 group-hover:w-full ${isClothingActive ? 'hidden' : ''}`} />
+            </span>
+            {isClothingActive && (
+              <motion.span 
+                layoutId="desktop-nav-underline"
+                className="absolute bottom-0 left-3.5 right-3.5 h-[2px] bg-[#C1121F] rounded-full"
+              />
+            )}
+          </button>
+
+          {/* 3. Men (Gender Filter) */}
+          <button
+            onClick={() => handleNavGender('Men')}
+            className={`relative px-3.5 py-2 text-[15px] xl:text-[16px] font-medium tracking-tight transition-all rounded-md outline-none focus:outline-none focus-visible:outline-none focus-visible:opacity-80 group ${
               isMenActive 
                 ? 'text-[#C1121F] font-semibold' 
                 : 'text-[#111111]/80 hover:text-[#111111]'
@@ -162,15 +240,15 @@ export const DesktopNav: React.FC<DesktopNavProps> = ({
             {isMenActive && (
               <motion.span 
                 layoutId="desktop-nav-underline"
-                className="absolute bottom-0 left-4 right-4 h-[2px] bg-[#C1121F] rounded-full"
+                className="absolute bottom-0 left-3.5 right-3.5 h-[2px] bg-[#C1121F] rounded-full"
               />
             )}
           </button>
 
-          {/* 3. Women */}
+          {/* 4. Women (Gender Filter) */}
           <button
-            onClick={() => handleNavClick('Women Sneakers', 'catalog')}
-            className={`relative px-4 py-2 text-[16px] xl:text-[17px] font-medium tracking-tight transition-all rounded-md outline-none focus:outline-none focus-visible:outline-none focus-visible:opacity-80 group ${
+            onClick={() => handleNavGender('Women')}
+            className={`relative px-3.5 py-2 text-[15px] xl:text-[16px] font-medium tracking-tight transition-all rounded-md outline-none focus:outline-none focus-visible:outline-none focus-visible:opacity-80 group ${
               isWomenActive 
                 ? 'text-[#C1121F] font-semibold' 
                 : 'text-[#111111]/80 hover:text-[#111111]'
@@ -183,15 +261,36 @@ export const DesktopNav: React.FC<DesktopNavProps> = ({
             {isWomenActive && (
               <motion.span 
                 layoutId="desktop-nav-underline"
-                className="absolute bottom-0 left-4 right-4 h-[2px] bg-[#C1121F] rounded-full"
+                className="absolute bottom-0 left-3.5 right-3.5 h-[2px] bg-[#C1121F] rounded-full"
               />
             )}
           </button>
 
-          {/* 4. Sale */}
+          {/* 5. New Arrivals */}
           <button
-            onClick={() => handleNavClick(undefined, 'catalog', true)}
-            className={`relative px-4 py-2 text-[16px] xl:text-[17px] font-medium tracking-tight transition-all rounded-md outline-none focus:outline-none focus-visible:outline-none focus-visible:opacity-80 group ${
+            onClick={handleNavNewArrivals}
+            className={`relative px-3.5 py-2 text-[15px] xl:text-[16px] font-medium tracking-tight transition-all rounded-md outline-none focus:outline-none focus-visible:outline-none focus-visible:opacity-80 group ${
+              isNewArrivalsActive 
+                ? 'text-[#C7A55B] font-bold' 
+                : 'text-[#111111]/80 hover:text-[#C7A55B]'
+            }`}
+          >
+            <span className="relative">
+              New
+              <span className={`absolute -bottom-1 left-0 w-0 h-[2px] bg-[#C7A55B]/60 transition-all duration-200 group-hover:w-full ${isNewArrivalsActive ? 'hidden' : ''}`} />
+            </span>
+            {isNewArrivalsActive && (
+              <motion.span 
+                layoutId="desktop-nav-underline"
+                className="absolute bottom-0 left-3.5 right-3.5 h-[2px] bg-[#C7A55B] rounded-full"
+              />
+            )}
+          </button>
+
+          {/* 6. Sale */}
+          <button
+            onClick={handleNavSale}
+            className={`relative px-3.5 py-2 text-[15px] xl:text-[16px] font-medium tracking-tight transition-all rounded-md outline-none focus:outline-none focus-visible:outline-none focus-visible:opacity-80 group ${
               isSaleActive 
                 ? 'text-[#C1121F] font-bold' 
                 : 'text-[#C1121F] hover:text-[#9b0d18]'
@@ -204,14 +303,14 @@ export const DesktopNav: React.FC<DesktopNavProps> = ({
             {isSaleActive && (
               <motion.span 
                 layoutId="desktop-nav-underline"
-                className="absolute bottom-0 left-4 right-4 h-[2px] bg-[#C1121F] rounded-full"
+                className="absolute bottom-0 left-3.5 right-3.5 h-[2px] bg-[#C1121F] rounded-full"
               />
             )}
           </button>
 
           {/* 5. About */}
           <button
-            onClick={() => handleNavClick(undefined, 'brand-story')}
+            onClick={() => handleNavClick('brand-story')}
             className={`relative px-4 py-2 text-[16px] xl:text-[17px] font-medium tracking-tight transition-all rounded-md outline-none focus:outline-none focus-visible:outline-none focus-visible:opacity-80 group ${
               isAboutActive 
                 ? 'text-[#C1121F] font-semibold' 
@@ -232,7 +331,7 @@ export const DesktopNav: React.FC<DesktopNavProps> = ({
 
           {/* 6. Contact */}
           <button
-            onClick={() => handleNavClick(undefined, 'contact')}
+            onClick={() => handleNavClick('contact')}
             className={`relative px-4 py-2 text-[16px] xl:text-[17px] font-medium tracking-tight transition-all rounded-md outline-none focus:outline-none focus-visible:outline-none focus-visible:opacity-80 group ${
               isContactActive 
                 ? 'text-[#C1121F] font-semibold' 
@@ -251,6 +350,9 @@ export const DesktopNav: React.FC<DesktopNavProps> = ({
             )}
           </button>
         </nav>
+
+        {/* Mega Menu Dropdown */}
+        <MegaMenu isOpen={isMegaMenuOpen} onClose={() => setIsMegaMenuOpen(false)} />
 
         {/* ========================================================================= */}
         {/* RIGHT: SEARCH, WISHLIST, CART, PROFILE (CUSTOMER ACCOUNT) */}

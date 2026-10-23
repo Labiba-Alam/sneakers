@@ -1,4 +1,4 @@
-import { Product, CategoryType } from '../types';
+import { Product, CategoryType, DepartmentType, SneakerBrand, ClothingType, GenderType } from '../types';
 
 export interface CSVProductRow {
   sku: string;
@@ -59,7 +59,7 @@ export const CSV_CATALOG_TEMPLATE_HEADER = [
 export const CSV_CATALOG_SAMPLE_ROW = [
   'KNG-OZX-BLK',
   'Kingsman Onyx Runner',
-  'Men Sneakers',
+  'Nike',
   'Streetwear',
   'Unisex',
   '6500',
@@ -129,7 +129,14 @@ export function parseProductCatalogCSV(csvContent: string): ImportValidationResu
 
     const sku = (rowMap['sku'] || '').trim().toUpperCase();
     const name = (rowMap['name'] || '').trim();
-    const category = (rowMap['category'] || 'Men Sneakers').trim() as CategoryType;
+    const rawCategory = (rowMap['category'] || 'Nike').trim();
+    const isSneakerBrand = ['Nike', 'Jordan', 'Adidas', 'New Balance', 'Converse', 'Louis Vuitton'].includes(rawCategory);
+    const category = (isSneakerBrand ? rawCategory : ['T-Shirt', 'Hoodie', 'Sweatshirt'].includes(rawCategory) ? rawCategory : 'Nike') as CategoryType;
+    const department: DepartmentType = isSneakerBrand ? 'Sneakers' : 'Clothing';
+    const brand = isSneakerBrand ? (category as SneakerBrand) : undefined;
+    const clothingType = !isSneakerBrand ? (category as ClothingType) : undefined;
+    const rawGender = (rowMap['gender'] || 'Unisex').trim();
+    const gender: GenderType = rawGender === 'Men' ? 'Men' : rawGender === 'Women' ? 'Women' : 'Unisex';
     const price = parseFloat(rowMap['price_bdt'] || '0');
     const salePrice = parseFloat(rowMap['sale_price_bdt'] || '0');
     const description = (rowMap['description'] || '').trim();
@@ -157,14 +164,14 @@ export function parseProductCatalogCSV(csvContent: string): ImportValidationResu
     }
 
     // Size stocks
-    const sizeStock: Record<number, number> = {};
+    const sizeStock: Record<string, number> = {};
     const sizeKeys = [39, 40, 41, 42, 43, 44, 45];
     let rowTotalStock = 0;
 
     sizeKeys.forEach(size => {
       const stockVal = parseInt(rowMap[`stock_${size}`] || '0', 10);
       const safeVal = isNaN(stockVal) || stockVal < 0 ? 0 : stockVal;
-      sizeStock[size] = safeVal;
+      sizeStock[String(size)] = safeVal;
       rowTotalStock += safeVal;
       if (safeVal > 0) totalSizesCount++;
     });
@@ -174,6 +181,7 @@ export function parseProductCatalogCSV(csvContent: string): ImportValidationResu
       : undefined;
 
     const productId = `kng-${sku.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+    const slug = `${(brand || clothingType || 'item').toLowerCase()}-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
 
     products.push({
       id: productId,
@@ -181,30 +189,36 @@ export function parseProductCatalogCSV(csvContent: string): ImportValidationResu
       name,
       subtitle: rowMap['subcategory'] || `${category} Streetwear Edition`,
       category,
+      department,
+      brand,
+      clothingType,
+      gender,
+      weightGrams: department === 'Sneakers' ? 1100 : 350,
+      slug,
       price: salePrice > 0 && salePrice < price ? salePrice : price,
       originalPrice: salePrice > 0 && salePrice < price ? price : undefined,
       discountPercent,
       stock: rowTotalStock,
       sizeStock,
-      sizes: sizeKeys.filter(s => sizeStock[s] > 0),
+      sizes: sizeKeys.filter(s => (sizeStock[String(s)] || 0) > 0),
       colors: [{ name: color, hex: color.toLowerCase().includes('black') ? '#111111' : '#C1121F' }],
       images: images.length > 0 ? images : ['https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=1200&q=85'],
-      description: description || 'Premium KINGSMAN unisex streetwear sneaker silhouette.',
+      description: description || 'Premium KINGSMAN unisex streetwear silhouette.',
       craftsmanshipDetails: [
-        material || 'Premium leather & technical textile construction',
-        'Laser-etched KINGSMAN insignia',
+        material || 'Premium construction',
+        'KINGSMAN insignia',
         'Ergonomic cushioned footbed',
-        'High-density grip vulcanized rubber outsole',
+        'High-density grip outsole',
       ],
-      materials: material || 'Full-Grain Leather, Technical Mesh, High-Grip Rubber',
-      careInstructions: 'Clean gently with damp cloth. Store in dry luxury dust bag.',
+      materials: material || 'Premium Materials',
+      careInstructions: 'Clean gently with damp cloth. Store in dry dust bag.',
       isFeatured: rowMap['is_featured']?.toUpperCase() === 'TRUE',
       isNewArrival: rowMap['is_new_drop']?.toUpperCase() === 'TRUE',
       isBestSeller: false,
       isLimitedEdition: false,
       rating: 5.0,
       reviewCount: 0,
-      tags: [category, 'Streetwear', 'Imported Quality'],
+      tags: [category, department, 'Imported Quality'],
     });
   }
 

@@ -23,21 +23,72 @@ export const ShopBreadcrumb: React.FC = () => {
 
         <button
           onClick={() => {
-            setFilters(prev => ({ ...prev, category: 'All', searchQuery: '' }));
+            setFilters(prev => ({
+              ...prev,
+              category: 'All',
+              department: 'All',
+              brand: 'All',
+              clothingType: 'All',
+              gender: 'All',
+              searchQuery: '',
+              isSaleOnly: false,
+              isNewArrivalsOnly: false
+            }));
             setView('catalog');
           }}
           className={`hover:text-[#C7A55B] transition-colors ${
-            filters.category === 'All' ? 'text-white font-bold' : ''
+            filters.category === 'All' && (!filters.department || filters.department === 'All') && (!filters.gender || filters.gender === 'All') ? 'text-white font-bold' : ''
           }`}
         >
           Shop
         </button>
+
+        {filters.department && filters.department !== 'All' && (
+          <>
+            <ChevronRight className="w-3.5 h-3.5 text-white/30 shrink-0" />
+            <button
+              onClick={() => {
+                setFilters(prev => ({ ...prev, category: 'All', brand: 'All', clothingType: 'All' }));
+              }}
+              className="hover:text-[#C7A55B] transition-colors uppercase font-bold"
+            >
+              {filters.department}
+            </button>
+          </>
+        )}
 
         {filters.category !== 'All' && (
           <>
             <ChevronRight className="w-3.5 h-3.5 text-white/30 shrink-0" />
             <span className="text-[#C7A55B] font-bold uppercase tracking-wider">
               {filters.category}
+            </span>
+          </>
+        )}
+
+        {filters.gender && filters.gender !== 'All' && (
+          <>
+            <ChevronRight className="w-3.5 h-3.5 text-white/30 shrink-0" />
+            <span className="text-white/80 uppercase font-semibold">
+              {filters.gender}
+            </span>
+          </>
+        )}
+
+        {filters.isNewArrivalsOnly && (
+          <>
+            <ChevronRight className="w-3.5 h-3.5 text-white/30 shrink-0" />
+            <span className="text-[#C7A55B] uppercase font-semibold">
+              New Arrivals
+            </span>
+          </>
+        )}
+
+        {filters.isSaleOnly && (
+          <>
+            <ChevronRight className="w-3.5 h-3.5 text-white/30 shrink-0" />
+            <span className="text-[#C1121F] uppercase font-semibold">
+              Sale
             </span>
           </>
         )}

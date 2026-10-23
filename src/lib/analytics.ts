@@ -214,7 +214,7 @@ export const trackProductView = (product: Product, currency: string = 'USD') => 
  */
 export const trackAddToCart = (
   product: Product,
-  selectedSize: number,
+  selectedSize: string | number,
   selectedColor?: { name: string; hex: string },
   quantity: number = 1,
   currency: string = 'USD'

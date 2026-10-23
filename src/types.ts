@@ -1,20 +1,12 @@
-export type CategoryType = 
-  | 'Men Sneakers'
-  | 'Women Sneakers'
-  | 'Sports Shoes'
-  | 'Casual Sneakers'
-  | 'Running Shoes'
-  | 'Basketball Shoes'
-  | 'High Tops'
-  | 'Low Tops'
-  | 'Slides & Sandals'
-  | 'Accessories'
-  | 'New Arrivals'
-  | 'Sale'
-  | 'Lifestyle'
-  | 'Running'
-  | 'Basketball'
-  | 'Limited Edition';
+export type DepartmentType = 'Sneakers' | 'Clothing';
+
+export type SneakerBrand = 'Nike' | 'Jordan' | 'Adidas' | 'New Balance' | 'Converse' | 'Louis Vuitton';
+
+export type ClothingType = 'T-Shirt' | 'Hoodie' | 'Sweatshirt';
+
+export type GenderType = 'Men' | 'Women' | 'Unisex';
+
+export type CategoryType = SneakerBrand | ClothingType;
 
 export type PaymentMethod = 'COD' | 'SSLCommerz/Card' | 'bKash' | 'Nagad' | 'Rocket';
 
@@ -141,10 +133,16 @@ export interface Product {
   originalPrice?: number;
   discountPercent?: number;
   stock: number;
-  sizeStock?: Record<number, number>; // per size stock mapping (e.g. { 40: 5, 41: 2, 42: 0 })
+  sizeStock?: Record<string | number, number>; // per size stock mapping (e.g. { "40": 5, "M": 3 })
   sku: string;
+  department: DepartmentType; // 'Sneakers' | 'Clothing'
+  brand?: SneakerBrand; // sneakers only: 'Nike' | 'Jordan' | 'Adidas' | 'New Balance' | 'Converse' | 'Louis Vuitton'
+  clothingType?: ClothingType; // clothing only: 'T-Shirt' | 'Hoodie' | 'Sweatshirt'
+  gender: GenderType; // 'Men' | 'Women' | 'Unisex'
   category: CategoryType;
-  sizes: number[]; // EU sizes: 39, 40, 41, 42, 43, 44, 45, 46
+  weightGrams: number;
+  slug: string;
+  sizes: (string | number)[]; // EU 39-46 for sneakers, S, M, L, XL, XXL for clothing
   colors: ProductColor[];
   images: string[];
   description: string;
@@ -158,12 +156,10 @@ export interface Product {
   rating: number;
   reviewCount: number;
   tags: string[];
-  brand?: string;
   seoTitle?: string;
   seoDescription?: string;
   metaImage?: string;
   ogImage?: string;
-  slug?: string;
   visibility?: 'Draft' | 'Published';
   isArchived?: boolean;
   relatedProductIds?: string[];
@@ -173,7 +169,7 @@ export interface Product {
 export interface CartItem {
   id: string; // unique item key (productId + size + color)
   product: Product;
-  selectedSize: number;
+  selectedSize: string | number;
   selectedColor: ProductColor;
   quantity: number;
 }
@@ -222,18 +218,22 @@ export interface Order {
 }
 
 export interface FilterState {
+  department: DepartmentType | 'All';
   category: CategoryType | 'All';
+  brand?: SneakerBrand | 'All';
+  clothingType?: ClothingType | 'All';
+  gender: GenderType | 'All';
   minPrice: number;
   maxPrice: number;
-  selectedSizes: number[];
+  selectedSizes: (string | number)[];
   selectedColors: string[];
   inStockOnly: boolean;
   isFeaturedOnly: boolean;
   isLimitedOnly: boolean;
   isSaleOnly: boolean;
+  isNewArrivalsOnly?: boolean;
   searchQuery: string;
   sortBy: 'featured' | 'price-low' | 'price-high' | 'rating' | 'newest' | 'oldest' | 'popular' | 'best-selling';
-  gender?: 'All' | 'Men' | 'Unisex';
 }
 
 export type Currency = 'BDT';

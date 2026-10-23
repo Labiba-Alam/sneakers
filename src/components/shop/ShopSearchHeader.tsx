@@ -13,7 +13,7 @@ export const ShopSearchHeader: React.FC = () => {
     setFilters(prev => ({ ...prev, searchQuery: '' }));
   };
 
-  const quickSearchTags = ['24K Gold', 'Monarch', 'Low Top', 'High Top', 'Running', 'Vibram', 'Black', 'Limited'];
+  const quickSearchTags = ['Nike', 'Jordan', 'Adidas', 'New Balance', 'Hoodie', 'T-Shirt', 'Louis Vuitton', 'Converse'];
 
   const handleTagClick = (tag: string) => {
     setFilters(prev => ({ ...prev, searchQuery: tag }));

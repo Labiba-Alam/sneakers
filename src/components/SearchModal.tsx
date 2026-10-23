@@ -47,7 +47,7 @@ export const SearchModal: React.FC = () => {
           <div className="space-y-3">
             <p className="text-[10px] uppercase tracking-widest text-white/50 font-semibold">Popular Searches</p>
             <div className="flex flex-wrap gap-2">
-              {['Limited Edition', 'High Tops', 'Low Tops', 'Running', 'Crimson'].map(term => (
+              {['Nike', 'Jordan', 'Adidas', 'New Balance', 'Hoodie', 'T-Shirt'].map(term => (
                 <button
                   key={term}
                   onClick={() => handleSuggestionClick(term)}

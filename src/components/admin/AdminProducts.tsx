@@ -5,20 +5,18 @@ import {
   Edit, 
   Trash2, 
   Copy, 
-  Eye, 
-  Archive, 
-  Check, 
-  Image as ImageIcon, 
   Upload, 
-  Sparkles, 
-  Star, 
-  Tag, 
-  Layers, 
-  Globe, 
-  FileText,
   AlertCircle
 } from 'lucide-react';
-import { Product, CategoryType, ProductColor } from '../../types';
+import { 
+  Product, 
+  CategoryType, 
+  DepartmentType, 
+  SneakerBrand, 
+  ClothingType, 
+  GenderType 
+} from '../../types';
+import { SNEAKER_BRANDS, CLOTHING_TYPES } from '../../data/products';
 
 interface AdminProductsProps {
   products: Product[];
@@ -29,6 +27,9 @@ interface AdminProductsProps {
   onCloseAddModalFromParent?: () => void;
 }
 
+const SNEAKER_SIZES: number[] = [39, 40, 41, 42, 43, 44, 45, 46];
+const CLOTHING_SIZES: string[] = ['S', 'M', 'L', 'XL', 'XXL'];
+
 export const AdminProducts: React.FC<AdminProductsProps> = ({
   products,
   onAddProduct,
@@ -38,6 +39,7 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({
   onCloseAddModalFromParent
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState<'All' | DepartmentType>('All');
   const [categoryFilter, setCategoryFilter] = useState<string>('All');
   const [visibilityFilter, setVisibilityFilter] = useState<string>('All');
   const [isEditorOpen, setIsEditorOpen] = useState(isAddModalOpenFromParent || false);
@@ -55,22 +57,26 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({
   // Form state
   const [formData, setFormData] = useState<Partial<Product>>({
     name: '',
-    brand: 'KINGSMAN',
-    subtitle: 'Royal Handcrafted Silhouette',
-    category: 'Lifestyle',
-    price: 350,
-    originalPrice: 420,
+    department: 'Sneakers',
+    brand: 'Nike',
+    clothingType: undefined,
+    category: 'Nike',
+    gender: 'Men',
+    subtitle: 'Luxury Silhouette',
+    price: 9500,
+    originalPrice: 11500,
     sku: `KNG-${Math.floor(1000 + Math.random() * 9000)}`,
     stock: 25,
-    sizeStock: { 39: 3, 40: 5, 41: 8, 42: 6, 43: 3, 44: 0 },
-    sizes: [39, 40, 41, 42, 43, 44],
-    description: 'Masterfully crafted luxury sneaker with Italian calfskin upper and royal cushioning.',
-    craftsmanshipDetails: ['Italian Full-Grain Leather', 'Hand-stitched Margom Sole', 'Gold Foil Stamping'],
-    materials: '100% Calfskin Leather',
-    careInstructions: 'Clean with soft cloth and leather balm.',
-    images: ['https://images.unsplash.com/photo-1552346154-21d32810aba3?auto=format&fit=crop&w=800&q=80'],
+    sizeStock: { '39': 3, '40': 5, '41': 8, '42': 6, '43': 3 },
+    sizes: [39, 40, 41, 42, 43],
+    weightGrams: 1150,
+    description: 'Masterfully crafted luxury silhouette with premium finishings.',
+    craftsmanshipDetails: ['Handcrafted Upper', 'Ergonomic Cushioning', 'Signature Box'],
+    materials: 'Premium Materials',
+    careInstructions: 'Clean with soft cloth and specialized balm.',
+    images: ['https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80'],
     colors: [{ name: 'Royal Gold', hex: '#C7A55B' }],
-    tags: ['Luxury', 'Limited', 'Crafted'],
+    tags: ['Luxury', 'Curated'],
     isFeatured: true,
     isNewArrival: true,
     isBestSeller: false,
@@ -81,45 +87,44 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({
     slug: ''
   });
 
-  const availableCategories: CategoryType[] = [
-    'Lifestyle',
-    'Running',
-    'Basketball',
-    'High Tops',
-    'Low Tops',
-    'Limited Edition',
-    'New Arrivals',
-    'Sale',
-    'Accessories'
-  ];
-
   const filteredProducts = products.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.sku.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCat = categoryFilter === 'All' || p.category === categoryFilter;
-    const matchesVis = visibilityFilter === 'All' || p.visibility === visibilityFilter || (visibilityFilter === 'Archived' && p.isArchived);
-    return matchesSearch && matchesCat && matchesVis;
+    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          p.sku.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesDept = departmentFilter === 'All' || p.department === departmentFilter;
+    const matchesCat = categoryFilter === 'All' || 
+                       p.category === categoryFilter || 
+                       p.brand === categoryFilter || 
+                       p.clothingType === categoryFilter;
+    const matchesVis = visibilityFilter === 'All' || 
+                       p.visibility === visibilityFilter || 
+                       (visibilityFilter === 'Archived' && p.isArchived);
+    return matchesSearch && matchesDept && matchesCat && matchesVis;
   });
 
   const handleOpenNew = () => {
     setEditingProduct(null);
     setFormData({
       name: '',
-      brand: 'KINGSMAN',
-      subtitle: 'Royal Handcrafted Silhouette',
-      category: 'Lifestyle',
-      price: 350,
-      originalPrice: 420,
+      department: 'Sneakers',
+      brand: 'Nike',
+      clothingType: undefined,
+      category: 'Nike',
+      gender: 'Men',
+      subtitle: 'Luxury Silhouette',
+      price: 8500,
+      originalPrice: 10500,
       sku: `KNG-${Math.floor(1000 + Math.random() * 9000)}`,
       stock: 25,
-      sizeStock: { 39: 3, 40: 5, 41: 8, 42: 6, 43: 3, 44: 0 },
-      sizes: [39, 40, 41, 42, 43, 44],
-      description: 'Masterfully crafted luxury sneaker with Italian calfskin upper and royal cushioning.',
-      craftsmanshipDetails: ['Italian Full-Grain Leather', 'Hand-stitched Margom Sole'],
-      materials: '100% Calfskin',
-      careInstructions: 'Store in velvet dust bag.',
-      images: ['https://images.unsplash.com/photo-1552346154-21d32810aba3?auto=format&fit=crop&w=800&q=80'],
+      sizeStock: { '39': 3, '40': 5, '41': 8, '42': 6, '43': 3 },
+      sizes: [39, 40, 41, 42, 43],
+      weightGrams: 1100,
+      description: 'Handcrafted luxury footwear crafted for modern elegance.',
+      craftsmanshipDetails: ['Italian Leather', 'Durable Sole'],
+      materials: 'Premium Leather',
+      careInstructions: 'Store in protective dust bag.',
+      images: ['https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80'],
       colors: [{ name: 'Onyx Black', hex: '#111111' }],
-      tags: ['Luxury', 'High Top'],
+      tags: ['Luxury'],
       isFeatured: false,
       isNewArrival: true,
       isBestSeller: false,
@@ -138,6 +143,25 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({
     setIsEditorOpen(true);
   };
 
+  const handleDepartmentChange = (dept: DepartmentType) => {
+    const isSneaker = dept === 'Sneakers';
+    const defaultCat = isSneaker ? 'Nike' : 'T-Shirt';
+    const defaultSizes = isSneaker ? [39, 40, 41, 42, 43, 44] : ['S', 'M', 'L', 'XL'];
+    const initialSizeStock: Record<string, number> = {};
+    defaultSizes.forEach(s => { initialSizeStock[String(s)] = 5; });
+
+    setFormData(prev => ({
+      ...prev,
+      department: dept,
+      brand: isSneaker ? ('Nike' as SneakerBrand) : undefined,
+      clothingType: !isSneaker ? ('T-Shirt' as ClothingType) : undefined,
+      category: defaultCat as CategoryType,
+      sizes: defaultSizes,
+      sizeStock: initialSizeStock,
+      weightGrams: isSneaker ? 1100 : 350
+    }));
+  };
+
   const handleDuplicate = (product: Product) => {
     const dup: Product = {
       ...product,
@@ -145,7 +169,8 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({
       name: `${product.name} (Copy)`,
       sku: `${product.sku}-DUP`,
       rating: 5.0,
-      reviewCount: 0
+      reviewCount: 0,
+      slug: `${product.slug || product.name.toLowerCase().replace(/\s+/g, '-')}-copy`
     };
     onAddProduct(dup);
   };
@@ -155,37 +180,57 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({
     if (!formData.name?.trim()) return;
 
     const totalStock = formData.sizeStock 
-      ? (Object.values(formData.sizeStock) as number[]).reduce((a, b) => a + Number(b), 0)
+      ? Object.values(formData.sizeStock).reduce((a: number, b) => a + Number(b), 0)
       : formData.stock || 20;
+
+    const department = formData.department || 'Sneakers';
+    const isSneaker = department === 'Sneakers';
+    const brand = isSneaker ? (formData.brand as SneakerBrand || 'Nike') : undefined;
+    const clothingType = !isSneaker ? (formData.clothingType as ClothingType || 'T-Shirt') : undefined;
+    const category: CategoryType = isSneaker ? (brand as SneakerBrand) : (clothingType as ClothingType);
+
+    const generatedSlug = formData.slug?.trim() || 
+      `${(brand || clothingType || 'item').toLowerCase()}-${formData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
 
     const completeProduct: Product = {
       id: editingProduct ? editingProduct.id : `p-${Date.now()}`,
-      name: formData.name || 'Untitled Silhouette',
+      name: formData.name.trim(),
       subtitle: formData.subtitle || 'Royal Craft',
-      price: Number(formData.price) || 299,
+      price: Number(formData.price) || 2999,
       originalPrice: formData.originalPrice ? Number(formData.originalPrice) : undefined,
+      discountPercent: (formData.originalPrice && formData.originalPrice > Number(formData.price))
+        ? Math.round(((formData.originalPrice - Number(formData.price)) / formData.originalPrice) * 100)
+        : 0,
       stock: totalStock,
-      sizeStock: formData.sizeStock || { 39: 5, 40: 5, 41: 5, 42: 5 },
+      sizeStock: formData.sizeStock || {},
       sku: formData.sku || `SKU-${Date.now()}`,
-      category: (formData.category as CategoryType) || 'Lifestyle',
-      sizes: formData.sizes || [39, 40, 41, 42, 43, 44],
+      department,
+      brand,
+      clothingType,
+      category,
+      gender: formData.gender || 'Unisex',
+      weightGrams: Number(formData.weightGrams) || (isSneaker ? 1100 : 350),
+      sizes: formData.sizes && formData.sizes.length > 0 
+        ? formData.sizes 
+        : (isSneaker ? SNEAKER_SIZES : CLOTHING_SIZES),
       colors: formData.colors || [{ name: 'Midnight', hex: '#111' }],
-      images: formData.images && formData.images.length > 0 ? formData.images : ['https://images.unsplash.com/photo-1552346154-21d32810aba3?auto=format&fit=crop&w=800&q=80'],
+      images: formData.images && formData.images.length > 0 
+        ? formData.images 
+        : ['https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80'],
       description: formData.description || '',
       craftsmanshipDetails: formData.craftsmanshipDetails || ['Handcrafted'],
-      materials: formData.materials || 'Genuine Leather',
+      materials: formData.materials || 'Premium Materials',
       careInstructions: formData.careInstructions || 'Wipe clean',
       isFeatured: !!formData.isFeatured,
       isNewArrival: !!formData.isNewArrival,
       isBestSeller: !!formData.isBestSeller,
       isLimitedEdition: !!formData.isLimitedEdition,
-      rating: editingProduct ? editingProduct.rating : 4.9,
-      reviewCount: editingProduct ? editingProduct.reviewCount : 12,
-      tags: formData.tags || ['Sneaker'],
-      brand: formData.brand || 'KINGSMAN',
+      rating: editingProduct ? editingProduct.rating : 5.0,
+      reviewCount: editingProduct ? editingProduct.reviewCount : 1,
+      tags: formData.tags || [category, department],
       seoTitle: formData.seoTitle || formData.name,
       seoDescription: formData.seoDescription || formData.description,
-      slug: formData.slug || formData.name?.toLowerCase().replace(/\s+/g, '-'),
+      slug: generatedSlug,
       visibility: formData.visibility || 'Published'
     };
 
@@ -206,10 +251,10 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="font-serif-luxury text-2xl font-bold text-white tracking-wide">
-            PRODUCT CATALOG & SILHOUETTES
+            PRODUCT CATALOG & INVENTORY
           </h1>
           <p className="text-xs text-white/60">
-            Manage sneaker items, per-size stock matrices, media assets & SEO metadata.
+            Manage Sneakers & Clothing departments, size stock matrices & weights.
           </p>
         </div>
 
@@ -218,12 +263,12 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({
           className="flex items-center justify-center gap-2 px-4 py-2 bg-[#C1121F] hover:bg-[#a30f1a] text-white text-xs uppercase font-bold tracking-wider rounded transition-all shadow-lg red-border-glow"
         >
           <Plus className="w-4 h-4" />
-          <span>Add New Silhouette</span>
+          <span>Add New Product</span>
         </button>
       </div>
 
       {/* Filter & Search Bar */}
-      <div className="bg-[#141414] border border-white/10 p-4 rounded-lg grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="bg-[#141414] border border-white/10 p-4 rounded-lg grid grid-cols-1 sm:grid-cols-4 gap-3">
         <div className="relative">
           <Search className="w-4 h-4 text-white/40 absolute left-3 top-3" />
           <input
@@ -237,14 +282,40 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({
 
         <div>
           <select
+            value={departmentFilter}
+            onChange={(e) => {
+              setDepartmentFilter(e.target.value as any);
+              setCategoryFilter('All');
+            }}
+            className="w-full px-3 py-2 bg-[#181818] border border-white/15 text-white text-xs rounded focus:outline-none focus:border-[#C7A55B]"
+          >
+            <option value="All">All Departments</option>
+            <option value="Sneakers">Sneakers</option>
+            <option value="Clothing">Clothing</option>
+          </select>
+        </div>
+
+        <div>
+          <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
             className="w-full px-3 py-2 bg-[#181818] border border-white/15 text-white text-xs rounded focus:outline-none focus:border-[#C7A55B]"
           >
-            <option value="All">All Categories ({products.length})</option>
-            {availableCategories.map(c => (
-              <option key={c} value={c}>{c}</option>
-            ))}
+            <option value="All">All Categories / Brands ({products.length})</option>
+            {(departmentFilter === 'All' || departmentFilter === 'Sneakers') && (
+              <optgroup label="Sneaker Brands">
+                {SNEAKER_BRANDS.map(b => (
+                  <option key={b} value={b}>{b}</option>
+                ))}
+              </optgroup>
+            )}
+            {(departmentFilter === 'All' || departmentFilter === 'Clothing') && (
+              <optgroup label="Clothing Categories">
+                {CLOTHING_TYPES.map(t => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </optgroup>
+            )}
           </select>
         </div>
 
@@ -277,11 +348,11 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({
                   <span className="px-2 py-0.5 bg-black/80 text-[#C7A55B] font-mono text-[10px] font-bold uppercase rounded border border-[#C7A55B]/30">
                     {product.sku}
                   </span>
-                  {product.isLimitedEdition && (
-                    <span className="px-2 py-0.5 bg-[#C1121F] text-white text-[10px] font-bold uppercase rounded">
-                      Limited
-                    </span>
-                  )}
+                  <span className={`px-2 py-0.5 text-[9px] font-bold uppercase rounded ${
+                    product.department === 'Sneakers' ? 'bg-[#C7A55B] text-[#111]' : 'bg-[#C1121F] text-white'
+                  }`}>
+                    {product.department}
+                  </span>
                 </div>
 
                 <div className="absolute bottom-2 right-2 px-2 py-0.5 bg-black/80 text-white font-mono text-xs font-bold rounded">
@@ -295,10 +366,20 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({
                     <h3 className="font-serif-luxury font-bold text-white text-sm group-hover:text-[#C7A55B] transition-colors">
                       {product.name}
                     </h3>
-                    <p className="text-[10px] text-white/50">{product.category}</p>
+                    <div className="flex items-center gap-2 text-[10px] text-white/50 mt-0.5">
+                      <span className="text-[#C7A55B] font-semibold">{product.category}</span>
+                      <span>•</span>
+                      <span>{product.gender || 'Unisex'}</span>
+                      {product.weightGrams && (
+                        <>
+                          <span>•</span>
+                          <span>{product.weightGrams}g</span>
+                        </>
+                      )}
+                    </div>
                   </div>
                   {product.stock < 5 && (
-                    <span className="px-2 py-0.5 bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] font-bold uppercase rounded flex items-center gap-1 animate-pulse">
+                    <span className="px-2 py-0.5 bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] font-bold uppercase rounded flex items-center gap-1">
                       <AlertCircle className="w-3 h-3" /> Low ({product.stock})
                     </span>
                   )}
@@ -310,7 +391,7 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({
                     const q = Number(qty);
                     return (
                       <span key={sz} className={`text-[9px] px-1.5 py-0.5 rounded font-mono ${q === 0 ? 'bg-red-500/20 text-red-400' : q <= 3 ? 'bg-amber-500/20 text-amber-400' : 'bg-white/10 text-white/70'}`}>
-                        EU{sz}: {q}
+                        {sz}: {q}
                       </span>
                     );
                   })}
@@ -359,9 +440,9 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({
             <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-4">
               <div>
                 <h2 className="font-serif-luxury text-xl font-bold text-white">
-                  {editingProduct ? `EDIT: ${editingProduct.name}` : 'CREATE NEW SILHOUETTE'}
+                  {editingProduct ? `EDIT: ${editingProduct.name}` : 'CREATE NEW PRODUCT'}
                 </h2>
-                <p className="text-xs text-white/50">Enter detailed craftsmanship parameters and size matrix.</p>
+                <p className="text-xs text-white/50">Configure department, brand/type, size stock matrix and weights.</p>
               </div>
               <button
                 onClick={() => {
@@ -401,6 +482,72 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({
               {/* Tab 1: Basic Info */}
               {activeTab === 'basic' && (
                 <div className="space-y-4">
+                  
+                  {/* Department & Brand / Type Row */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-white/5 border border-white/10 rounded">
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-[#C7A55B] block mb-1">Department</label>
+                      <select
+                        value={formData.department || 'Sneakers'}
+                        onChange={(e) => handleDepartmentChange(e.target.value as DepartmentType)}
+                        className="w-full px-3 py-2 bg-[#181818] border border-white/15 text-white text-xs rounded focus:outline-none focus:border-[#C7A55B]"
+                      >
+                        <option value="Sneakers">Sneakers</option>
+                        <option value="Clothing">Clothing</option>
+                      </select>
+                    </div>
+
+                    {formData.department === 'Sneakers' ? (
+                      <div>
+                        <label className="text-[10px] uppercase font-bold text-[#C7A55B] block mb-1">Brand (Sneakers)</label>
+                        <select
+                          value={formData.brand || 'Nike'}
+                          onChange={(e) => setFormData({ 
+                            ...formData, 
+                            brand: e.target.value as SneakerBrand,
+                            category: e.target.value as CategoryType
+                          })}
+                          className="w-full px-3 py-2 bg-[#181818] border border-white/15 text-white text-xs rounded focus:outline-none focus:border-[#C7A55B]"
+                        >
+                          {SNEAKER_BRANDS.map(b => (
+                            <option key={b} value={b}>{b}</option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="text-[10px] uppercase font-bold text-[#C7A55B] block mb-1">Clothing Type</label>
+                        <select
+                          value={formData.clothingType || 'T-Shirt'}
+                          onChange={(e) => setFormData({ 
+                            ...formData, 
+                            clothingType: e.target.value as ClothingType,
+                            category: e.target.value as CategoryType
+                          })}
+                          className="w-full px-3 py-2 bg-[#181818] border border-white/15 text-white text-xs rounded focus:outline-none focus:border-[#C7A55B]"
+                        >
+                          {CLOTHING_TYPES.map(t => (
+                            <option key={t} value={t}>{t}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-[#C7A55B] block mb-1">Gender (Filter)</label>
+                      <select
+                        value={formData.gender || 'Men'}
+                        onChange={(e) => setFormData({ ...formData, gender: e.target.value as GenderType })}
+                        className="w-full px-3 py-2 bg-[#181818] border border-white/15 text-white text-xs rounded focus:outline-none focus:border-[#C7A55B]"
+                      >
+                        <option value="Men">Men</option>
+                        <option value="Women">Women</option>
+                        <option value="Unisex">Unisex</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Name and SKU */}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-[10px] uppercase font-bold text-white/70 block mb-1">Product Name</label>
@@ -410,7 +557,7 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                         className="w-full px-3 py-2 bg-[#181818] border border-white/15 text-white text-xs rounded focus:outline-none focus:border-[#C7A55B]"
-                        placeholder="KINGSMAN Sovereign Low"
+                        placeholder="e.g. Air Jordan 1 Retro High OG"
                       />
                     </div>
                     <div>
@@ -425,17 +572,8 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({
                     </div>
                   </div>
 
+                  {/* Price, Original Price, Weight */}
                   <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <label className="text-[10px] uppercase font-bold text-white/70 block mb-1">Category</label>
-                      <select
-                        value={formData.category}
-                        onChange={(e) => setFormData({ ...formData, category: e.target.value as CategoryType })}
-                        className="w-full px-3 py-2 bg-[#181818] border border-white/15 text-white text-xs rounded focus:outline-none focus:border-[#C7A55B]"
-                      >
-                        {availableCategories.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                    </div>
                     <div>
                       <label className="text-[10px] uppercase font-bold text-white/70 block mb-1">Price (৳ BDT)</label>
                       <input
@@ -453,6 +591,17 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({
                         value={formData.originalPrice || ''}
                         onChange={(e) => setFormData({ ...formData, originalPrice: Number(e.target.value) })}
                         className="w-full px-3 py-2 bg-[#181818] border border-white/15 text-white text-xs font-mono rounded focus:outline-none focus:border-[#C7A55B]"
+                        placeholder="For discount display"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-white/70 block mb-1">Weight (Grams)</label>
+                      <input
+                        type="number"
+                        value={formData.weightGrams || ''}
+                        onChange={(e) => setFormData({ ...formData, weightGrams: Number(e.target.value) })}
+                        className="w-full px-3 py-2 bg-[#181818] border border-white/15 text-white text-xs font-mono rounded focus:outline-none focus:border-[#C7A55B]"
+                        placeholder="e.g. 1100"
                       />
                     </div>
                   </div>
@@ -489,19 +638,19 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({
                 </div>
               )}
 
-              {/* Tab 2: Images & Drag/Drop Simulator */}
+              {/* Tab 2: Images */}
               {activeTab === 'images' && (
                 <div className="space-y-4">
                   <div className="p-6 border-2 border-dashed border-white/20 rounded-lg text-center bg-[#181818] hover:border-[#C7A55B] transition-colors">
                     <Upload className="w-8 h-8 text-[#C7A55B] mx-auto mb-2" />
-                    <p className="text-xs font-bold text-white">Drag & Drop High-Res Product Photos</p>
-                    <p className="text-[10px] text-white/50 mb-3">Supports JPG, PNG, WEBP (Auto WebP compression & retina crop)</p>
+                    <p className="text-xs font-bold text-white">Product Photo URLs</p>
+                    <p className="text-[10px] text-white/50 mb-3">Add direct links to high-resolution product imagery</p>
                     <button
                       type="button"
                       onClick={() => {
-                        const newImg = prompt('Enter Image URL for luxury silhouette photo:');
-                        if (newImg) {
-                          setFormData({ ...formData, images: [...(formData.images || []), newImg] });
+                        const newImg = prompt('Enter Image URL:');
+                        if (newImg && newImg.trim()) {
+                          setFormData({ ...formData, images: [...(formData.images || []), newImg.trim()] });
                         }
                       }}
                       className="px-4 py-2 bg-[#C7A55B] text-[#111] text-xs font-bold uppercase tracking-wider rounded"
@@ -532,29 +681,49 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({
                 </div>
               )}
 
-              {/* Tab 3: Size Stock Matrix */}
+              {/* Tab 3: Size Stock Matrix (Department specific) */}
               {activeTab === 'sizes' && (
                 <div className="space-y-4">
-                  <p className="text-xs text-white/60">Define stock quantity per European shoe size.</p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-white/60">
+                      Define stock quantity per size for {formData.department || 'Sneakers'}.
+                    </p>
+                    <span className="text-[10px] uppercase font-bold text-[#C7A55B]">
+                      {formData.department === 'Sneakers' ? 'EU Footwear Sizes' : 'Apparel Sizes'}
+                    </span>
+                  </div>
+
                   <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
-                    {[38, 39, 40, 41, 42, 43, 44, 45, 46].map(sz => (
-                      <div key={sz} className="p-3 bg-[#181818] border border-white/10 rounded">
-                        <label className="text-[10px] font-mono font-bold text-[#C7A55B] block mb-1">EU Size {sz}</label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={formData.sizeStock ? formData.sizeStock[sz] || 0 : 0}
-                          onChange={(e) => {
-                            const val = Number(e.target.value);
-                            setFormData({
-                              ...formData,
-                              sizeStock: { ...(formData.sizeStock || {}), [sz]: val }
-                            });
-                          }}
-                          className="w-full px-2 py-1 bg-[#111111] border border-white/20 text-white font-mono text-xs rounded"
-                        />
-                      </div>
-                    ))}
+                    {(formData.department === 'Sneakers' ? SNEAKER_SIZES : CLOTHING_SIZES).map(sz => {
+                      const szKey = String(sz);
+                      const currentVal = formData.sizeStock ? formData.sizeStock[szKey] || 0 : 0;
+                      return (
+                        <div key={szKey} className="p-3 bg-[#181818] border border-white/10 rounded">
+                          <label className="text-[10px] font-mono font-bold text-[#C7A55B] block mb-1">
+                            {formData.department === 'Sneakers' ? `EU ${sz}` : `Size ${sz}`}
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={currentVal}
+                            onChange={(e) => {
+                              const val = Math.max(0, Number(e.target.value));
+                              const updatedStock = { ...(formData.sizeStock || {}), [szKey]: val };
+                              const updatedSizes = Object.keys(updatedStock)
+                                .filter(k => updatedStock[k] > 0)
+                                .map(k => isNaN(Number(k)) ? k : Number(k));
+
+                              setFormData({
+                                ...formData,
+                                sizeStock: updatedStock,
+                                sizes: updatedSizes.length > 0 ? updatedSizes : (formData.department === 'Sneakers' ? SNEAKER_SIZES : CLOTHING_SIZES)
+                              });
+                            }}
+                            className="w-full px-2 py-1 bg-[#111111] border border-white/20 text-white font-mono text-xs rounded"
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -563,13 +732,24 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({
               {activeTab === 'seo' && (
                 <div className="space-y-4">
                   <div>
+                    <label className="text-[10px] uppercase font-bold text-white/70 block mb-1">URL Slug</label>
+                    <input
+                      type="text"
+                      value={formData.slug || ''}
+                      onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+                      className="w-full px-3 py-2 bg-[#181818] border border-white/15 text-white text-xs font-mono rounded"
+                      placeholder="e.g. jordan-1-retro-high-bred"
+                    />
+                  </div>
+
+                  <div>
                     <label className="text-[10px] uppercase font-bold text-white/70 block mb-1">SEO Page Title</label>
                     <input
                       type="text"
-                      value={formData.seoTitle}
+                      value={formData.seoTitle || ''}
                       onChange={(e) => setFormData({ ...formData, seoTitle: e.target.value })}
                       className="w-full px-3 py-2 bg-[#181818] border border-white/15 text-white text-xs rounded"
-                      placeholder="KINGSMAN Sovereign - Handcrafted Calfskin Sneakers"
+                      placeholder="Product SEO Title"
                     />
                   </div>
 
@@ -577,7 +757,7 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({
                     <label className="text-[10px] uppercase font-bold text-white/70 block mb-1">Meta Description</label>
                     <textarea
                       rows={2}
-                      value={formData.seoDescription}
+                      value={formData.seoDescription || ''}
                       onChange={(e) => setFormData({ ...formData, seoDescription: e.target.value })}
                       className="w-full px-3 py-2 bg-[#181818] border border-white/15 text-white text-xs rounded"
                     />
@@ -586,7 +766,7 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({
                   <div>
                     <label className="text-[10px] uppercase font-bold text-white/70 block mb-1">Visibility Status</label>
                     <select
-                      value={formData.visibility}
+                      value={formData.visibility || 'Published'}
                       onChange={(e) => setFormData({ ...formData, visibility: e.target.value as any })}
                       className="w-full px-3 py-2 bg-[#181818] border border-white/15 text-white text-xs rounded"
                     >
@@ -610,7 +790,7 @@ export const AdminProducts: React.FC<AdminProductsProps> = ({
                   type="submit"
                   className="px-6 py-2 bg-[#C1121F] text-white text-xs font-bold uppercase tracking-wider rounded"
                 >
-                  Save Silhouette
+                  Save Product
                 </button>
               </div>
 

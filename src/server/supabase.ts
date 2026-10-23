@@ -1,15 +1,30 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { env } from '../lib/env';
 import { INITIAL_PRODUCTS } from '../data/products';
 import { INITIAL_COUPONS } from '../data/coupons';
 import { Product, Order, Coupon, CartItem, InventoryLog, CustomerAccount } from '../types';
 
 let supabaseClient: SupabaseClient | null = null;
-let isSupabaseConfigured = false;
+let isSupabaseConfiguredState = false;
 
 // Quick lookup map for template static assets (colors, images, craftsmanship)
 const initialProductsMap = new Map<string, Product>();
 INITIAL_PRODUCTS.forEach(p => initialProductsMap.set(p.id, p));
+
+/**
+ * Checks whether Supabase connection parameters are valid and configured
+ */
+export function isSupabaseConfigured(): boolean {
+  const url = (process.env.SUPABASE_URL || '').trim();
+  const serviceKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+
+  return Boolean(
+    url &&
+    serviceKey &&
+    !url.includes('your-project') &&
+    !serviceKey.includes('your-service-role-key') &&
+    url.startsWith('https://')
+  );
+}
 
 /**
  * Initialize Supabase Client with Service Role Key for server-side persistence.
@@ -17,10 +32,10 @@ INITIAL_PRODUCTS.forEach(p => initialProductsMap.set(p.id, p));
 export function initSupabase(): SupabaseClient | null {
   if (supabaseClient) return supabaseClient;
 
-  const url = env.SUPABASE_URL || process.env.SUPABASE_URL || '';
-  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  const url = (process.env.SUPABASE_URL || '').trim();
+  const serviceKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 
-  if (url && serviceKey && !url.includes('your-project') && !serviceKey.includes('your-service-role-key')) {
+  if (isSupabaseConfigured()) {
     try {
       supabaseClient = createClient(url, serviceKey, {
         auth: {
@@ -28,27 +43,27 @@ export function initSupabase(): SupabaseClient | null {
           autoRefreshToken: false,
         },
       });
-      isSupabaseConfigured = true;
+      isSupabaseConfiguredState = true;
       console.log('✅ [SUPABASE] Connected successfully to Supabase PostgreSQL Database.');
       return supabaseClient;
     } catch (err: any) {
-      console.warn('⚠️ [SUPABASE] Initialization error:', err.message);
+      console.error('⚠️ [SUPABASE] Initialization error:', err.message);
     }
   }
 
-  console.warn(`
-================================================================================
-⚠️  [SUPABASE NOTICE] SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is not configured.
-    Falling back to in-memory persistence (productsStore, ordersStore, couponsStore).
-    Local preview remains 100% operational with seed data.
-================================================================================
-  `);
-  isSupabaseConfigured = false;
+  isSupabaseConfiguredState = false;
+
+  if (process.env.NODE_ENV === 'production') {
+    console.error('🚨 [PRODUCTION DATABASE ERROR] SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is missing in production. In-memory mode is strictly forbidden in production.');
+  } else {
+    console.warn('[WARNING] Supabase is not configured. Running with in-memory database fallback (Allowed only in local development).');
+  }
+
   return null;
 }
 
 export function isSupabaseActive(): boolean {
-  return isSupabaseConfigured && supabaseClient !== null;
+  return isSupabaseConfiguredState && supabaseClient !== null;
 }
 
 /**
@@ -82,8 +97,14 @@ export async function seedSupabaseIfEmpty(): Promise<void> {
           stock: p.stock,
           sku: p.sku,
           category: p.category,
+          department: p.department || 'Sneakers',
+          brand: p.brand || null,
+          clothing_type: p.clothingType || null,
+          gender: p.gender || 'Unisex',
+          weight_grams: p.weightGrams || 1100,
+          slug: p.slug || p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
           description: p.description || '',
-          materials: p.materials || 'Full-Grain Leather, Gold Hardware',
+          materials: p.materials || 'Premium Materials',
           care_instructions: p.careInstructions || 'Clean with damp cloth and mild cleanser.',
           is_featured: p.isFeatured || false,
           is_new_arrival: p.isNewArrival || false,
@@ -104,10 +125,12 @@ export async function seedSupabaseIfEmpty(): Promise<void> {
       INITIAL_PRODUCTS.forEach(p => {
         const sizes = p.sizes && p.sizes.length > 0 ? p.sizes : [39, 40, 41, 42, 43, 44, 45, 46];
         sizes.forEach(size => {
-          const qty = p.sizeStock?.[size] ?? Math.max(1, Math.floor(p.stock / sizes.length));
+          const qty = p.sizeStock?.[size] ?? p.sizeStock?.[String(size)] ?? Math.max(1, Math.floor(p.stock / sizes.length));
+          const numSize = typeof size === 'number' ? size : parseInt(String(size), 10);
           sizesRows.push({
             product_id: p.id,
-            size_eu: size,
+            size_name: String(size),
+            size_eu: !isNaN(numSize) ? numSize : null,
             stock_quantity: qty,
             is_active: true,
           });
@@ -116,7 +139,7 @@ export async function seedSupabaseIfEmpty(): Promise<void> {
 
       for (let i = 0; i < sizesRows.length; i += 50) {
         const batch = sizesRows.slice(i, i + 50);
-        await supabaseClient.from('product_sizes').upsert(batch, { onConflict: 'product_id,size_eu' });
+        await supabaseClient.from('product_sizes').upsert(batch);
       }
 
       // 3. Seed Coupons
@@ -143,16 +166,25 @@ export async function seedSupabaseIfEmpty(): Promise<void> {
  */
 function mapDbProductToClient(row: any): Product {
   const fallback = initialProductsMap.get(row.id);
-  const dbSizes: number[] = (row.product_sizes || [])
-    .map((s: any) => Number(s.size_eu))
-    .sort((a: number, b: number) => a - b);
   
-  const sizeStock: Record<number, number> = {};
+  const sizeStock: Record<string, number> = {};
+  const dbSizes: (string | number)[] = [];
+
   (row.product_sizes || []).forEach((s: any) => {
-    sizeStock[s.size_eu] = Number(s.stock_quantity);
+    const key = s.size_name || (s.size_eu !== null && s.size_eu !== undefined ? String(s.size_eu) : '');
+    if (key) {
+      sizeStock[key] = Number(s.stock_quantity);
+      const num = Number(key);
+      dbSizes.push(!isNaN(num) && String(num) === key ? num : key);
+    }
   });
 
-  const sizes = dbSizes.length > 0 ? dbSizes : fallback?.sizes || [39, 40, 41, 42, 43, 44, 45, 46];
+  const isSneaker = row.department === 'Sneakers' || ['Nike', 'Jordan', 'Adidas', 'New Balance', 'Converse', 'Louis Vuitton'].includes(row.category);
+  const department = row.department || (isSneaker ? 'Sneakers' : 'Clothing');
+  const brand = row.brand || (isSneaker ? (row.category || fallback?.brand || 'Nike') : undefined);
+  const clothingType = row.clothing_type || (!isSneaker ? (row.category || fallback?.clothingType || 'T-Shirt') : undefined);
+  const category = (isSneaker ? brand : clothingType) || row.category || 'Nike';
+  const sizes = dbSizes.length > 0 ? dbSizes : fallback?.sizes || (department === 'Sneakers' ? [39, 40, 41, 42, 43, 44, 45, 46] : ['S', 'M', 'L', 'XL', 'XXL']);
 
   return {
     id: row.id,
@@ -164,7 +196,13 @@ function mapDbProductToClient(row: any): Product {
     stock: Number(row.stock),
     sizeStock: Object.keys(sizeStock).length > 0 ? sizeStock : fallback?.sizeStock,
     sku: row.sku,
-    category: row.category as any,
+    category: category as any,
+    department,
+    brand,
+    clothingType,
+    gender: row.gender || fallback?.gender || 'Unisex',
+    weightGrams: row.weight_grams ? Number(row.weight_grams) : fallback?.weightGrams || (department === 'Sneakers' ? 1100 : 350),
+    slug: row.slug || fallback?.slug || row.name?.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
     sizes: sizes,
     colors: fallback?.colors || [
       { name: 'Royal Crimson & Gold', hex: '#C1121F' },
@@ -181,7 +219,7 @@ function mapDbProductToClient(row: any): Product {
       'Polished gold-tone heel emblem',
       'High-traction anti-slip rubber outsole'
     ],
-    materials: row.materials || fallback?.materials || 'Full-Grain Leather, Gold-Tone Hardware',
+    materials: row.materials || fallback?.materials || 'Premium Materials',
     careInstructions: row.care_instructions || fallback?.careInstructions || 'Clean sole rubber with a soft damp cloth.',
     isFeatured: Boolean(row.is_featured),
     isNewArrival: Boolean(row.is_new_arrival),
@@ -189,8 +227,7 @@ function mapDbProductToClient(row: any): Product {
     isLimitedEdition: Boolean(row.is_limited_edition),
     rating: row.rating ? Number(row.rating) : 5.0,
     reviewCount: row.review_count ? Number(row.review_count) : 12,
-    tags: fallback?.tags || [row.category, 'Luxury', 'Curated'],
-    brand: 'KINGSMAN',
+    tags: fallback?.tags || [category, department, 'Curated'],
   };
 }
 
@@ -238,12 +275,33 @@ export const dbProducts = {
     }
   },
 
+  async getById(id: string): Promise<Product | null> {
+    if (!supabaseClient) return null;
+    try {
+      const { data, error } = await supabaseClient
+        .from('products')
+        .select('*, product_sizes(*)')
+        .or(`id.eq.${id},sku.eq.${id}`)
+        .maybeSingle();
+
+      if (error || !data) return null;
+      return mapDbProductToClient(data);
+    } catch {
+      return null;
+    }
+  },
+
   async create(product: Partial<Product>): Promise<Product | null> {
     if (!supabaseClient) return null;
 
     try {
       const id = product.id || `kng-${Date.now().toString().slice(-6)}`;
       const sku = product.sku || `KNG-CUSTOM-${Math.floor(100 + Math.random() * 900)}`;
+      const department = product.department || 'Sneakers';
+      const isSneaker = department === 'Sneakers';
+      const brand = isSneaker ? (product.brand || 'Nike') : undefined;
+      const clothingType = !isSneaker ? (product.clothingType || 'T-Shirt') : undefined;
+      const category = (isSneaker ? brand : clothingType) || product.category || 'Nike';
 
       const row = {
         id,
@@ -254,9 +312,15 @@ export const dbProducts = {
         discount_percent: product.discountPercent || 0,
         stock: product.stock || 10,
         sku,
-        category: product.category || 'Lifestyle',
+        category,
+        department,
+        brand: brand || null,
+        clothing_type: clothingType || null,
+        gender: product.gender || 'Unisex',
+        weight_grams: product.weightGrams || (isSneaker ? 1100 : 350),
+        slug: product.slug || (product.name ? product.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') : 'silhouette'),
         description: product.description || '',
-        materials: product.materials || 'Full-Grain Leather',
+        materials: product.materials || 'Premium Materials',
         care_instructions: product.careInstructions || '',
         is_featured: product.isFeatured || false,
         is_new_arrival: product.isNewArrival || true,
@@ -270,13 +334,17 @@ export const dbProducts = {
       if (error) throw error;
 
       // Insert per-size stock
-      const sizes = product.sizes && product.sizes.length > 0 ? product.sizes : [40, 41, 42, 43, 44, 45];
-      const sizeRows = sizes.map(size => ({
-        product_id: id,
-        size_eu: size,
-        stock_quantity: product.sizeStock?.[size] ?? Math.max(1, Math.floor((product.stock || 10) / sizes.length)),
-        is_active: true,
-      }));
+      const sizes = product.sizes && product.sizes.length > 0 ? product.sizes : (isSneaker ? [40, 41, 42, 43, 44, 45] : ['S', 'M', 'L', 'XL']);
+      const sizeRows = sizes.map(size => {
+        const numSize = typeof size === 'number' ? size : parseInt(String(size), 10);
+        return {
+          product_id: id,
+          size_name: String(size),
+          size_eu: !isNaN(numSize) ? numSize : null,
+          stock_quantity: product.sizeStock?.[size] ?? product.sizeStock?.[String(size)] ?? Math.max(1, Math.floor((product.stock || 10) / sizes.length)),
+          is_active: true,
+        };
+      });
 
       await supabaseClient.from('product_sizes').insert(sizeRows);
 
@@ -284,6 +352,13 @@ export const dbProducts = {
         ...product,
         id,
         sku,
+        category: category as any,
+        department,
+        brand,
+        clothingType,
+        gender: row.gender,
+        weightGrams: row.weight_grams,
+        slug: row.slug,
         stock: row.stock,
         rating: row.rating,
         reviewCount: row.review_count,
@@ -308,6 +383,12 @@ export const dbProducts = {
       if (updates.stock !== undefined) rowUpdates.stock = updates.stock;
       if (updates.sku !== undefined) rowUpdates.sku = updates.sku;
       if (updates.category !== undefined) rowUpdates.category = updates.category;
+      if (updates.department !== undefined) rowUpdates.department = updates.department;
+      if (updates.brand !== undefined) rowUpdates.brand = updates.brand;
+      if (updates.clothingType !== undefined) rowUpdates.clothing_type = updates.clothingType;
+      if (updates.gender !== undefined) rowUpdates.gender = updates.gender;
+      if (updates.weightGrams !== undefined) rowUpdates.weight_grams = updates.weightGrams;
+      if (updates.slug !== undefined) rowUpdates.slug = updates.slug;
       if (updates.description !== undefined) rowUpdates.description = updates.description;
       if (updates.materials !== undefined) rowUpdates.materials = updates.materials;
       if (updates.careInstructions !== undefined) rowUpdates.care_instructions = updates.careInstructions;
@@ -389,7 +470,11 @@ export const dbOrders = {
             price: Number(item.unit_price),
             stock: 10,
             sku: `KNG-${item.product_id}`,
-            category: 'Lifestyle',
+            category: 'Nike',
+            department: 'Sneakers',
+            brand: 'Nike',
+            gender: 'Unisex',
+            slug: `product-${item.product_id}`,
             sizes: [item.selected_size],
             colors: [{ name: item.selected_color, hex: '#C1121F' }],
             images: ['https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=1000&q=85'],

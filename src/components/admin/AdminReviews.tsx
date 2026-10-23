@@ -19,7 +19,7 @@ export const AdminReviews: React.FC = () => {
     {
       id: 'rev-2',
       productId: 'p-2',
-      author: 'Labiba A.',
+      author: 'Sadia R.',
       rating: 5,
       title: 'Fast Delivery in Dhaka!',
       comment: 'Received the box in Gulshan in under 24 hours. The luxury unboxing experience is top notch.',

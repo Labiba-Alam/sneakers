@@ -29,9 +29,9 @@ export const AdminCustomers: React.FC<AdminCustomersProps> = ({ orders }) => {
     },
     {
       id: 'cust-2',
-      fullName: 'Labiba Alam',
+      fullName: 'Sadia Rahman',
       phone: '+880 1711 000000',
-      email: 'alam.labiba003@gmail.com',
+      email: 's.rahman@example.com',
       district: 'Dhaka - Inside City',
       area: 'Gulshan 2',
       address: 'Road 71, House 14',

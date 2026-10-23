@@ -10,9 +10,13 @@ export const Hero: React.FC = () => {
 
   const flagshipProduct = products.find(p => p.id === 'kng-001') || products[0];
 
-  const handleExplore = (category?: string) => {
-    if (category) {
-      setFilters(prev => ({ ...prev, category: category as any }));
+  const handleExplore = (flag?: 'new' | 'limited') => {
+    if (flag === 'new') {
+      setFilters(prev => ({ ...prev, isNewArrivalsOnly: true, category: 'All' }));
+    } else if (flag === 'limited') {
+      setFilters(prev => ({ ...prev, isLimitedOnly: true, category: 'All' }));
+    } else {
+      setFilters(prev => ({ ...prev, category: 'All' }));
     }
     setView('catalog');
   };
@@ -106,11 +110,11 @@ export const Hero: React.FC = () => {
             </button>
 
             <button
-              onClick={() => handleExplore('Limited Edition')}
+              onClick={() => handleExplore('new')}
               className="w-full sm:flex-1 py-3 px-6 bg-transparent border border-[#111111]/30 hover:bg-[#111111] hover:text-white text-[#111111] text-xs uppercase tracking-[0.2em] font-bold transition-all duration-300 min-h-[44px] flex items-center justify-center gap-2"
             >
               <Crown className="w-3.5 h-3.5 text-[#C7A55B]" />
-              <span>Explore Collection</span>
+              <span>New Arrivals</span>
             </button>
           </div>
 
@@ -190,7 +194,7 @@ export const Hero: React.FC = () => {
               </button>
 
               <button
-                onClick={() => handleExplore('Limited Edition')}
+                onClick={() => handleExplore('limited')}
                 className="w-full sm:w-auto px-8 py-4 bg-transparent border-2 border-[#111111] text-[#111111] hover:bg-[#111111] hover:text-white text-xs uppercase tracking-[0.2em] font-bold rounded-none transition-all duration-300 flex items-center justify-center gap-2"
               >
                 <Crown className="w-4 h-4 text-[#C7A55B]" />

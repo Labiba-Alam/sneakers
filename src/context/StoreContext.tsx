@@ -33,7 +33,7 @@ interface StoreContextType {
   
   // Cart State
   cart: CartItem[];
-  addToCart: (product: Product, selectedSize: number, selectedColor: { name: string; hex: string }, quantity?: number) => void;
+  addToCart: (product: Product, selectedSize: string | number, selectedColor: { name: string; hex: string }, quantity?: number) => void;
   removeFromCart: (cartItemId: string) => void;
   updateCartQuantity: (cartItemId: string, quantity: number) => void;
   clearCart: () => void;
@@ -74,6 +74,7 @@ interface StoreContextType {
   activeOrder: Order | null;
   setActiveOrder: (order: Order | null) => void;
   allOrders: Order[];
+  setAllOrders: React.Dispatch<React.SetStateAction<Order[]>>;
   placeOrder: (orderData: Partial<Order>) => Promise<Order>;
   updateOrderStatus: (orderId: string, status: Order['orderStatus']) => Promise<void>;
   
@@ -105,17 +106,22 @@ interface StoreContextType {
 }
 
 const DEFAULT_FILTERS: FilterState = {
+  department: 'All',
   category: 'All',
+  brand: 'All',
+  clothingType: 'All',
+  gender: 'All',
   minPrice: 0,
-  maxPrice: 15000,
+  maxPrice: 50000,
   selectedSizes: [],
   selectedColors: [],
   inStockOnly: false,
   isFeaturedOnly: false,
   isLimitedOnly: false,
   isSaleOnly: false,
+  isNewArrivalsOnly: false,
   searchQuery: '',
-  sortBy: 'featured'
+  sortBy: 'featured',
 };
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -165,16 +171,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [allOrders, setAllOrders] = useState<Order[]>([]);
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  // Customer Account state with local persistence
-  const [customer, setCustomer] = useState<CustomerAccount | null>(() => {
-    try {
-      const saved = localStorage.getItem('kingsman_customer');
-      if (saved) return JSON.parse(saved);
-      return null;
-    } catch {
-      return null;
-    }
-  });
+  // Store operates guest-only
+  const [customer, setCustomer] = useState<CustomerAccount | null>(null);
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalTab, setAuthModalTab] = useState<'login' | 'register'>('login');
@@ -189,7 +187,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.setItem('kingsman_wishlist', JSON.stringify(wishlist));
   }, [wishlist]);
 
-  // Sync initial products & orders from server and handle payment return callbacks
+  // Sync initial products from server and handle payment return callbacks
   useEffect(() => {
     fetch('/api/products')
       .then(res => res.json())
@@ -201,15 +199,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       .catch(() => {
         // Fallback to initial local products
       });
-
-    fetch('/api/orders')
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) {
-          setAllOrders(data);
-        }
-      })
-      .catch(() => {});
 
     // Check if returning from SSLCommerz Payment Gateway
     try {
@@ -365,7 +354,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const addToCart = (product: Product, selectedSize: number, selectedColor: { name: string; hex: string }, quantity = 1) => {
+  const addToCart = (product: Product, selectedSize: string | number, selectedColor: { name: string; hex: string }, quantity = 1) => {
     const itemId = `${product.id}-${selectedSize}-${selectedColor.name}`;
     
     setCart(prev => {
@@ -377,7 +366,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
 
     trackAddToCart(product, selectedSize, selectedColor, quantity, currency);
-    showToast(`Added ${product.name} (EU ${selectedSize}) to cart.`);
+    const sizeLabel = product.department === 'Clothing' ? `${selectedSize}` : `EU ${selectedSize}`;
+    showToast(`Added ${product.name} (${sizeLabel}) to cart.`);
     setIsCartOpen(true);
   };
 
@@ -579,74 +569,22 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  // Customer Account handlers
-  const customerLogin = async (identifier: string, password?: string): Promise<boolean> => {
-    const isEmail = identifier.includes('@');
-    const userEmail = isEmail ? identifier : (customer?.email || 'alam.labiba003@gmail.com');
-    const userPhone = isEmail ? (customer?.phone || '+880 1712-345678') : identifier;
-    const namePart = isEmail ? identifier.split('@')[0] : 'Member';
-    const userName = namePart.toLowerCase() === 'alam.labiba003' 
-      ? 'Labiba Alam' 
-      : namePart.replace(/[._]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-
-    const loggedUser: CustomerAccount = {
-      id: customer?.id || 'cst-8801',
-      fullName: customer?.fullName || userName,
-      phone: userPhone,
-      email: userEmail,
-      district: customer?.district || 'Dhaka',
-      area: customer?.area || 'Gulshan-2',
-      address: customer?.address || 'Road 71, House 12, Gulshan-2, Dhaka 1212',
-      createdAt: customer?.createdAt || '2024-01-15',
-      totalOrders: customer?.totalOrders || 3,
-      totalSpent: customer?.totalSpent || 48500,
-      vipTier: customer?.vipTier || 'Royal Platinum',
-      accountStatus: 'Active',
-    };
-
-    setCustomer(loggedUser);
-    localStorage.setItem('kingsman_customer', JSON.stringify(loggedUser));
-    showToast(`Welcome back, ${loggedUser.fullName}!`, 'success');
-    return true;
+  // Guest-Checkout Only Handlers
+  const customerLogin = async (): Promise<boolean> => {
+    showToast('KINGSMAN operates with Guest Checkout. No account required.', 'info');
+    return false;
   };
 
-  const customerRegister = async (data: { fullName: string; phone: string; email?: string; password?: string }): Promise<boolean> => {
-    const newCustomer: CustomerAccount = {
-      id: 'cst-' + Math.floor(1000 + Math.random() * 9000),
-      fullName: data.fullName,
-      phone: data.phone,
-      email: data.email || `${data.fullName.toLowerCase().replace(/\s+/g, '.')}@kingsman.royal`,
-      district: 'Dhaka',
-      area: 'Dhanmondi',
-      address: 'House 42, Road 7/A, Dhanmondi, Dhaka 1209',
-      createdAt: new Date().toISOString().split('T')[0],
-      totalOrders: 0,
-      totalSpent: 0,
-      vipTier: 'Member',
-      accountStatus: 'Active',
-    };
-
-    setCustomer(newCustomer);
-    localStorage.setItem('kingsman_customer', JSON.stringify(newCustomer));
-    showToast(`Welcome to Kingsman, ${newCustomer.fullName}! Your royal account is active.`, 'success');
-    return true;
+  const customerRegister = async (): Promise<boolean> => {
+    showToast('KINGSMAN operates with Guest Checkout. No account required.', 'info');
+    return false;
   };
 
   const customerLogout = () => {
     setCustomer(null);
-    localStorage.removeItem('kingsman_customer');
-    showToast('Signed out of Kingsman customer account.', 'info');
   };
 
-  const updateCustomerProfile = (data: Partial<CustomerAccount>) => {
-    setCustomer(prev => {
-      if (!prev) return null;
-      const updated = { ...prev, ...data };
-      localStorage.setItem('kingsman_customer', JSON.stringify(updated));
-      return updated;
-    });
-    showToast('Customer profile updated.', 'success');
-  };
+  const updateCustomerProfile = () => {};
 
   const openAuthModal = useCallback((tab: 'login' | 'register' = 'login') => {
     setAuthModalTab(tab);
@@ -712,6 +650,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         activeOrder,
         setActiveOrder,
         allOrders,
+        setAllOrders,
         placeOrder,
         updateOrderStatus,
         toasts,

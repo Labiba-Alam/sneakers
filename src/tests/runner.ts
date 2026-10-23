@@ -76,7 +76,7 @@ export async function runAllSystemTests(): Promise<{ passedCount: number; failed
       sku: 'KNG-TEST-01',
       price: 450,
       image: 'https://example.com/img.jpg',
-      category: 'High Tops',
+      category: 'Jordan',
       description: 'Luxury sneaker description',
       stock: 5,
       rating: 5.0,

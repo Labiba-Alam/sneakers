@@ -7,7 +7,7 @@ export const LimitedDrop: React.FC = () => {
   const { setView, setFilters, products, formatPrice } = useStore();
 
   // Find the limited drop item or fallback to first product
-  const dropProduct = products.find(p => p.category === 'Limited Edition') || products[0];
+  const dropProduct = products.find(p => p.isLimitedEdition) || products[0];
 
   // Countdown timer logic (e.g. 2 days, 14 hours, 32 mins, 18 secs)
   const [timeLeft, setTimeLeft] = useState({
@@ -34,7 +34,7 @@ export const LimitedDrop: React.FC = () => {
   }, []);
 
   const handleShopLimited = () => {
-    setFilters(prev => ({ ...prev, category: 'Limited Edition' }));
+    setFilters(prev => ({ ...prev, isLimitedOnly: true, category: 'All' }));
     setView('catalog');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };

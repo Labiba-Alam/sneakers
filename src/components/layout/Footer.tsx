@@ -135,22 +135,22 @@ export const Footer: React.FC = () => {
               <h4 className="font-serif-luxury text-sm font-bold text-[#C7A55B] uppercase tracking-[0.2em]">Collections</h4>
               <ul className="space-y-2.5 text-xs text-white/70 font-light">
                 <li>
-                  <button onClick={() => handleCategoryFilter('Men Sneakers')} className="hover:text-white transition-colors cursor-pointer">Men Sneakers</button>
+                  <button onClick={() => { setFilters(prev => ({ ...prev, department: 'Sneakers', category: 'Nike', brand: 'Nike' })); setView('catalog'); }} className="hover:text-white transition-colors cursor-pointer">Nike Footwear</button>
                 </li>
                 <li>
-                  <button onClick={() => handleCategoryFilter('Women Sneakers')} className="hover:text-white transition-colors cursor-pointer">Women Sneakers</button>
+                  <button onClick={() => { setFilters(prev => ({ ...prev, department: 'Sneakers', category: 'Jordan', brand: 'Jordan' })); setView('catalog'); }} className="hover:text-white transition-colors cursor-pointer">Jordan Retro</button>
                 </li>
                 <li>
-                  <button onClick={() => handleCategoryFilter('High Tops')} className="hover:text-white transition-colors cursor-pointer">High Tops</button>
+                  <button onClick={() => { setFilters(prev => ({ ...prev, department: 'Sneakers', category: 'Adidas', brand: 'Adidas' })); setView('catalog'); }} className="hover:text-white transition-colors cursor-pointer">Adidas Originals</button>
                 </li>
                 <li>
-                  <button onClick={() => handleCategoryFilter('Casual Sneakers')} className="hover:text-white transition-colors cursor-pointer">Casual Sneakers</button>
+                  <button onClick={() => { setFilters(prev => ({ ...prev, department: 'Sneakers', category: 'New Balance', brand: 'New Balance' })); setView('catalog'); }} className="hover:text-white transition-colors cursor-pointer">New Balance</button>
                 </li>
                 <li>
-                  <button onClick={() => handleCategoryFilter('Running Shoes')} className="hover:text-white transition-colors cursor-pointer">Running Silhouettes</button>
+                  <button onClick={() => { setFilters(prev => ({ ...prev, department: 'Clothing', category: 'Hoodie', clothingType: 'Hoodie' })); setView('catalog'); }} className="hover:text-white transition-colors cursor-pointer">Luxury Hoodies</button>
                 </li>
                 <li>
-                  <button onClick={() => handleCategoryFilter('Accessories')} className="hover:text-white transition-colors cursor-pointer">Accessories & Trees</button>
+                  <button onClick={() => { setFilters(prev => ({ ...prev, department: 'Clothing', category: 'T-Shirt', clothingType: 'T-Shirt' })); setView('catalog'); }} className="hover:text-white transition-colors cursor-pointer">Heavyweight Tees</button>
                 </li>
               </ul>
             </div>

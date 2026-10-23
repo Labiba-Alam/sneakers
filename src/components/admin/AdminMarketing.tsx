@@ -4,7 +4,7 @@ import { env } from '../../lib/env';
 
 export const AdminMarketing: React.FC = () => {
   const [subscribers] = useState([
-    { email: 'alam.labiba003@gmail.com', joinedAt: '2026-10-15', status: 'Subscribed' },
+    { email: 'subscriber@example.com', joinedAt: '2026-10-15', status: 'Subscribed' },
     { email: 'kingsmanszn@gmail.com', joinedAt: '2026-10-18', status: 'Subscribed (Owner)' },
   ]);
 
@@ -98,7 +98,7 @@ export const AdminMarketing: React.FC = () => {
             </span>
           </div>
           <p className="text-sm font-mono font-bold text-white">
-            {process.env.GOOGLE_SHEETS_WEBHOOK_URL ? 'Configured' : 'Script Ready in Root'}
+            Server Webhook Ready
           </p>
           <p className="text-[11px] text-white/50 leading-relaxed">
             Deploy GoogleAppsScript.js to your Google Sheet and set GOOGLE_SHEETS_WEBHOOK_URL to log live sales.

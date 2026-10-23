@@ -3,10 +3,11 @@ import { useStore } from '../context/StoreContext';
 import { ProductCard } from './ProductCard';
 import { 
   Filter, SlidersHorizontal, Grid3X3, LayoutGrid, X, Crown, RotateCcw, 
-  ChevronDown, ChevronUp, Check, Loader2 
+  ChevronDown, ChevronUp, Check, Loader2, Sparkles, Flame
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { CategoryType } from '../types';
+import { CategoryType, DepartmentType, GenderType, SneakerBrand, ClothingType } from '../types';
+import { SNEAKER_BRANDS, CLOTHING_TYPES } from '../data/products';
 import { ShopBreadcrumb } from './shop/ShopBreadcrumb';
 import { ShopHeroBanner } from './shop/ShopHeroBanner';
 import { ShopQuickViewModal } from './shop/ShopQuickViewModal';
@@ -14,20 +15,8 @@ import { ShopCompareDrawer } from './shop/ShopCompareDrawer';
 import { ShopRecentlyViewed } from './shop/ShopRecentlyViewed';
 import { ShopRecommendations } from './shop/ShopRecommendations';
 
-const CATEGORIES: (CategoryType | 'All')[] = [
-  'All',
-  'Men Sneakers',
-  'Women Sneakers',
-  'Sports Shoes',
-  'Casual Sneakers',
-  'Running Shoes',
-  'Basketball Shoes',
-  'High Tops',
-  'Limited Edition',
-  'Sale'
-];
-
-const AVAILABLE_SIZES = [39, 40, 41, 42, 43, 44, 45, 46];
+const SNEAKER_SIZES: number[] = [39, 40, 41, 42, 43, 44, 45, 46];
+const CLOTHING_SIZES: string[] = ['S', 'M', 'L', 'XL', 'XXL'];
 
 export const ProductGrid: React.FC = () => {
   const { products, filters, setFilters, resetFilters, formatPrice } = useStore();
@@ -38,18 +27,22 @@ export const ProductGrid: React.FC = () => {
 
   // Desktop Collapsible Filter Sidebar Sections
   const [collapsedSections, setCollapsedSections] = useState<{
-    category: boolean;
+    department: boolean;
+    brandType: boolean;
+    gender: boolean;
     size: boolean;
     price: boolean;
     availability: boolean;
   }>({
-    category: false,
+    department: false,
+    brandType: false,
+    gender: false,
     size: false,
     price: false,
     availability: false
   });
 
-  const toggleSection = (section: 'category' | 'size' | 'price' | 'availability') => {
+  const toggleSection = (section: keyof typeof collapsedSections) => {
     setCollapsedSections(prev => ({ ...prev, [section]: !prev[section] }));
   };
 
@@ -79,34 +72,78 @@ export const ProductGrid: React.FC = () => {
   // Filter and Sort Logic
   const filteredProducts = useMemo(() => {
     return products.filter(p => {
-      // Category Filter
-      if (filters.category !== 'All' && p.category !== filters.category) {
-        return false;
+      // 1. Department Filter
+      if (filters.department && filters.department !== 'All') {
+        if (p.department !== filters.department) return false;
       }
-      // Search Filter
+
+      // 2. Category / Brand / ClothingType Filter
+      if (filters.category && filters.category !== 'All') {
+        const matchesCategory = p.category === filters.category;
+        const matchesBrand = p.brand === filters.category;
+        const matchesClothingType = p.clothingType === filters.category;
+        if (!matchesCategory && !matchesBrand && !matchesClothingType) return false;
+      }
+
+      // Brand specific filter
+      if (filters.brand && filters.brand !== 'All') {
+        if (p.brand !== filters.brand) return false;
+      }
+
+      // Clothing type specific filter
+      if (filters.clothingType && filters.clothingType !== 'All') {
+        if (p.clothingType !== filters.clothingType) return false;
+      }
+
+      // 3. Gender Filter
+      if (filters.gender && filters.gender !== 'All') {
+        if (filters.gender === 'Men') {
+          if (p.gender !== 'Men' && p.gender !== 'Unisex') return false;
+        } else if (filters.gender === 'Women') {
+          if (p.gender !== 'Women' && p.gender !== 'Unisex') return false;
+        } else if (filters.gender === 'Unisex') {
+          if (p.gender !== 'Unisex') return false;
+        }
+      }
+
+      // 4. Search Filter
       if (filters.searchQuery) {
         const q = filters.searchQuery.toLowerCase();
         const matchName = p.name.toLowerCase().includes(q);
-        const matchSub = p.subtitle.toLowerCase().includes(q);
-        const matchSku = p.sku.toLowerCase().includes(q);
-        const matchCat = p.category.toLowerCase().includes(q);
+        const matchSub = (p.subtitle || '').toLowerCase().includes(q);
+        const matchSku = (p.sku || '').toLowerCase().includes(q);
+        const matchCat = (p.category || '').toLowerCase().includes(q);
+        const matchBrand = (p.brand || '').toLowerCase().includes(q);
+        const matchType = (p.clothingType || '').toLowerCase().includes(q);
+        const matchDept = (p.department || '').toLowerCase().includes(q);
         const matchTag = p.tags && p.tags.some(t => t.toLowerCase().includes(q));
-        if (!matchName && !matchSub && !matchSku && !matchCat && !matchTag) return false;
+        if (!matchName && !matchSub && !matchSku && !matchCat && !matchBrand && !matchType && !matchDept && !matchTag) {
+          return false;
+        }
       }
-      // Price Range Filter in BDT
+
+      // 5. Price Range Filter in BDT
       if (p.price < filters.minPrice || p.price > filters.maxPrice) {
         return false;
       }
-      // Sizes Filter
+
+      // 6. Sizes Filter (handles both number and string sizes)
       if (filters.selectedSizes.length > 0) {
-        const hasSize = filters.selectedSizes.some(s => p.sizes.includes(s));
+        const productSizesStr = (p.sizes || []).map(String);
+        const selectedSizesStr = filters.selectedSizes.map(String);
+        const hasSize = selectedSizesStr.some(s => productSizesStr.includes(s));
         if (!hasSize) return false;
       }
-      // Special Flags
+
+      // 7. Special Flags
       if (filters.inStockOnly && p.stock <= 0) return false;
       if (filters.isFeaturedOnly && !p.isFeatured) return false;
       if (filters.isLimitedOnly && !p.isLimitedEdition) return false;
-      if (filters.isSaleOnly && (!p.discountPercent || p.discountPercent <= 0)) return false;
+      if (filters.isSaleOnly) {
+        const isDiscounted = (p.discountPercent && p.discountPercent > 0) || (p.originalPrice && p.originalPrice > p.price);
+        if (!isDiscounted) return false;
+      }
+      if (filters.isNewArrivalsOnly && !p.isNewArrival) return false;
 
       return true;
     }).sort((a, b) => {
@@ -117,22 +154,46 @@ export const ProductGrid: React.FC = () => {
     });
   }, [products, filters]);
 
-  const handleCategorySelect = (cat: CategoryType | 'All') => {
-    setFilters(prev => ({ 
-      ...prev, 
-      category: cat,
-      isSaleOnly: cat === 'Sale' ? true : prev.isSaleOnly
+  const handleDepartmentSelect = (dept: DepartmentType | 'All') => {
+    setFilters(prev => ({
+      ...prev,
+      department: dept,
+      category: 'All',
+      brand: 'All',
+      clothingType: 'All',
+      selectedSizes: [] // Reset sizes since department changes sizing matrix
     }));
     setVisibleCount(8);
   };
 
-  const handleSizeToggle = (size: number) => {
+  const handleCategorySelect = (cat: CategoryType | 'All') => {
     setFilters(prev => {
-      const exists = prev.selectedSizes.includes(size);
+      const isSneaker = (SNEAKER_BRANDS as readonly string[]).includes(cat);
+      const isClothing = (CLOTHING_TYPES as readonly string[]).includes(cat);
+      return {
+        ...prev,
+        category: cat,
+        department: isSneaker ? 'Sneakers' : isClothing ? 'Clothing' : prev.department,
+        brand: isSneaker ? (cat as SneakerBrand) : 'All',
+        clothingType: isClothing ? (cat as ClothingType) : 'All'
+      };
+    });
+    setVisibleCount(8);
+  };
+
+  const handleGenderSelect = (gender: GenderType | 'All') => {
+    setFilters(prev => ({ ...prev, gender }));
+    setVisibleCount(8);
+  };
+
+  const handleSizeToggle = (size: number | string) => {
+    setFilters(prev => {
+      const sizeStr = String(size);
+      const exists = prev.selectedSizes.map(String).includes(sizeStr);
       return {
         ...prev,
         selectedSizes: exists
-          ? prev.selectedSizes.filter(s => s !== size)
+          ? prev.selectedSizes.filter(s => String(s) !== sizeStr)
           : [...prev.selectedSizes, size]
       };
     });
@@ -143,22 +204,35 @@ export const ProductGrid: React.FC = () => {
     setTimeout(() => {
       setVisibleCount(prev => prev + 4);
       setIsLoadingMore(false);
-    }, 350);
+    }, 300);
   };
 
   const activeFilterCount =
+    (filters.department && filters.department !== 'All' ? 1 : 0) +
     (filters.category !== 'All' ? 1 : 0) +
+    (filters.gender && filters.gender !== 'All' ? 1 : 0) +
     filters.selectedSizes.length +
     (filters.inStockOnly ? 1 : 0) +
     (filters.isLimitedOnly ? 1 : 0) +
     (filters.isSaleOnly ? 1 : 0) +
+    (filters.isNewArrivalsOnly ? 1 : 0) +
     (filters.maxPrice < 15000 ? 1 : 0) +
     (filters.searchQuery ? 1 : 0);
 
   const displayedProducts = filteredProducts.slice(0, visibleCount);
   const hasMore = visibleCount < filteredProducts.length;
 
-  const currentCategoryTitle = filters.category === 'All' ? 'All Silhouettes' : `${filters.category}`;
+  const currentCategoryTitle = useMemo(() => {
+    if (filters.category !== 'All') return filters.category;
+    if (filters.department && filters.department !== 'All') return `${filters.department} Collection`;
+    if (filters.gender && filters.gender !== 'All') return `${filters.gender}'s Collection`;
+    if (filters.isNewArrivalsOnly) return 'New Arrivals';
+    if (filters.isSaleOnly) return 'Sale Collection';
+    return 'All Products';
+  }, [filters]);
+
+  const showSneakerSizes = !filters.department || filters.department === 'All' || filters.department === 'Sneakers';
+  const showClothingSizes = !filters.department || filters.department === 'All' || filters.department === 'Clothing';
 
   return (
     <div className="bg-[#111111] min-h-screen text-white font-sans">
@@ -174,7 +248,6 @@ export const ProductGrid: React.FC = () => {
         
         {/* ========================================================================= */}
         {/* MOBILE & TABLET STICKY TOOLBAR (< 1024px) */}
-        {/* Sticky below navbar (top-16 = 64px), compact, touch-friendly min 44px */}
         {/* ========================================================================= */}
         <div className="lg:hidden sticky top-16 z-20 -mx-4 px-4 sm:-mx-6 sm:px-6 py-2.5 bg-[#141414]/95 backdrop-blur-md border-y border-white/10 mb-4 flex items-center justify-between gap-2 shadow-lg">
           {/* Filter Trigger Button */}
@@ -214,7 +287,7 @@ export const ProductGrid: React.FC = () => {
             {currentCategoryTitle}
           </h2>
           <span className="text-[11px] text-white/50 font-mono">
-            {filteredProducts.length} models
+            {filteredProducts.length} items
           </span>
         </div>
 
@@ -226,24 +299,40 @@ export const ProductGrid: React.FC = () => {
             <span className="text-[10px] text-white/50 uppercase tracking-widest font-bold shrink-0">
               Active:
             </span>
+            {filters.department && filters.department !== 'All' && (
+              <button
+                onClick={() => handleDepartmentSelect('All')}
+                className="px-2.5 py-1 bg-white/10 hover:bg-white/15 border border-white/20 text-white rounded text-[11px] flex items-center gap-1.5 shrink-0"
+              >
+                <span>Dept: {filters.department}</span>
+                <X className="w-3 h-3 text-[#C1121F]" />
+              </button>
+            )}
             {filters.category !== 'All' && (
               <button
-                onClick={() => setFilters(prev => ({ ...prev, category: 'All' }))}
+                onClick={() => setFilters(prev => ({ ...prev, category: 'All', brand: 'All', clothingType: 'All' }))}
                 className="px-2.5 py-1 bg-white/10 hover:bg-white/15 border border-white/20 text-white rounded text-[11px] flex items-center gap-1.5 shrink-0"
-                aria-label={`Remove category filter: ${filters.category}`}
               >
                 <span>{filters.category}</span>
                 <X className="w-3 h-3 text-[#C1121F]" />
               </button>
             )}
+            {filters.gender && filters.gender !== 'All' && (
+              <button
+                onClick={() => handleGenderSelect('All')}
+                className="px-2.5 py-1 bg-white/10 hover:bg-white/15 border border-white/20 text-white rounded text-[11px] flex items-center gap-1.5 shrink-0"
+              >
+                <span>Gender: {filters.gender}</span>
+                <X className="w-3 h-3 text-[#C1121F]" />
+              </button>
+            )}
             {filters.selectedSizes.map(size => (
               <button
-                key={size}
+                key={String(size)}
                 onClick={() => handleSizeToggle(size)}
                 className="px-2.5 py-1 bg-white/10 hover:bg-white/15 border border-white/20 text-white rounded text-[11px] flex items-center gap-1.5 shrink-0"
-                aria-label={`Remove size filter: EU ${size}`}
               >
-                <span>EU {size}</span>
+                <span>Size: {size}</span>
                 <X className="w-3 h-3 text-[#C1121F]" />
               </button>
             ))}
@@ -251,17 +340,24 @@ export const ProductGrid: React.FC = () => {
               <button
                 onClick={() => setFilters(prev => ({ ...prev, maxPrice: 15000 }))}
                 className="px-2.5 py-1 bg-white/10 hover:bg-white/15 border border-white/20 text-white rounded text-[11px] flex items-center gap-1.5 shrink-0"
-                aria-label="Remove max price filter"
               >
                 <span>Max: {formatPrice(filters.maxPrice)}</span>
                 <X className="w-3 h-3 text-[#C1121F]" />
+              </button>
+            )}
+            {filters.isNewArrivalsOnly && (
+              <button
+                onClick={() => setFilters(prev => ({ ...prev, isNewArrivalsOnly: false }))}
+                className="px-2.5 py-1 bg-[#C7A55B]/20 border border-[#C7A55B] text-[#C7A55B] rounded text-[11px] flex items-center gap-1.5 shrink-0 font-bold"
+              >
+                <span>New Arrivals</span>
+                <X className="w-3 h-3" />
               </button>
             )}
             {filters.isSaleOnly && (
               <button
                 onClick={() => setFilters(prev => ({ ...prev, isSaleOnly: false }))}
                 className="px-2.5 py-1 bg-[#C1121F]/20 border border-[#C1121F] text-[#C1121F] rounded text-[11px] flex items-center gap-1.5 shrink-0 font-bold"
-                aria-label="Remove sale only filter"
               >
                 <span>Sale Items</span>
                 <X className="w-3 h-3" />
@@ -271,7 +367,6 @@ export const ProductGrid: React.FC = () => {
               <button
                 onClick={() => setFilters(prev => ({ ...prev, inStockOnly: false }))}
                 className="px-2.5 py-1 bg-white/10 hover:bg-white/15 border border-white/20 text-white rounded text-[11px] flex items-center gap-1.5 shrink-0"
-                aria-label="Remove in stock filter"
               >
                 <span>In Stock</span>
                 <X className="w-3 h-3 text-[#C1121F]" />
@@ -294,7 +389,6 @@ export const ProductGrid: React.FC = () => {
           
           {/* ========================================================================= */}
           {/* DESKTOP COMPACT FILTER SIDEBAR (>= 1024px ONLY) */}
-          {/* Collapsible filter groups, clean, doesn't dominate product grid */}
           {/* ========================================================================= */}
           <aside className="hidden lg:block lg:col-span-3 bg-[#141414] border border-white/10 p-5 space-y-5 sticky top-24">
             <div className="flex items-center justify-between pb-3 border-b border-white/10">
@@ -317,65 +411,33 @@ export const ProductGrid: React.FC = () => {
               )}
             </div>
 
-            {/* 1. Category Group (Collapsible) */}
+            {/* 1. Department Selector */}
             <div className="border-b border-white/10 pb-4">
               <button
                 type="button"
-                onClick={() => toggleSection('category')}
+                onClick={() => toggleSection('department')}
                 className="w-full flex items-center justify-between text-[11px] uppercase tracking-widest text-white/70 hover:text-white font-bold py-1"
               >
-                <span>Categories</span>
-                {collapsedSections.category ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+                <span>Department</span>
+                {collapsedSections.department ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
               </button>
               
-              {!collapsedSections.category && (
-                <div className="space-y-1 mt-2.5">
-                  {CATEGORIES.map(cat => (
-                    <button
-                      key={cat}
-                      type="button"
-                      onClick={() => handleCategorySelect(cat)}
-                      className={`w-full text-left text-xs py-1.5 px-2.5 rounded transition-colors flex items-center justify-between ${
-                        filters.category === cat 
-                          ? 'bg-[#C1121F] text-white font-bold shadow-sm' 
-                          : 'text-white/70 hover:bg-white/5 hover:text-white'
-                      }`}
-                    >
-                      <span>{cat}</span>
-                      {filters.category === cat && <Check className="w-3.5 h-3.5 text-white" />}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* 2. Shoe Size Group (Collapsible) */}
-            <div className="border-b border-white/10 pb-4">
-              <button
-                type="button"
-                onClick={() => toggleSection('size')}
-                className="w-full flex items-center justify-between text-[11px] uppercase tracking-widest text-white/70 hover:text-white font-bold py-1"
-              >
-                <span>Shoe Size (EU)</span>
-                {collapsedSections.size ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
-              </button>
-
-              {!collapsedSections.size && (
-                <div className="grid grid-cols-4 gap-1.5 mt-2.5">
-                  {AVAILABLE_SIZES.map(size => {
-                    const isSelected = filters.selectedSizes.includes(size);
+              {!collapsedSections.department && (
+                <div className="grid grid-cols-3 gap-1.5 mt-2.5">
+                  {(['All', 'Sneakers', 'Clothing'] as const).map(dept => {
+                    const isSelected = (!filters.department && dept === 'All') || filters.department === dept;
                     return (
                       <button
-                        key={size}
+                        key={dept}
                         type="button"
-                        onClick={() => handleSizeToggle(size)}
-                        className={`py-1.5 text-xs font-bold border transition-colors rounded ${
+                        onClick={() => handleDepartmentSelect(dept)}
+                        className={`py-1.5 text-xs font-semibold rounded border transition-colors ${
                           isSelected
-                            ? 'bg-[#C1121F] border-[#C1121F] text-white shadow-sm'
+                            ? 'bg-[#C1121F] border-[#C1121F] text-white font-bold'
                             : 'bg-white/5 border-white/10 text-white/70 hover:border-white/30 hover:text-white'
                         }`}
                       >
-                        {size}
+                        {dept}
                       </button>
                     );
                   })}
@@ -383,7 +445,190 @@ export const ProductGrid: React.FC = () => {
               )}
             </div>
 
-            {/* 3. Price Range in BDT (Collapsible) */}
+            {/* 2. Brand / Clothing Type */}
+            <div className="border-b border-white/10 pb-4">
+              <button
+                type="button"
+                onClick={() => toggleSection('brandType')}
+                className="w-full flex items-center justify-between text-[11px] uppercase tracking-widest text-white/70 hover:text-white font-bold py-1"
+              >
+                <span>
+                  {filters.department === 'Clothing' ? 'Clothing Type' : filters.department === 'Sneakers' ? 'Sneaker Brand' : 'Brand / Type'}
+                </span>
+                {collapsedSections.brandType ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+              </button>
+              
+              {!collapsedSections.brandType && (
+                <div className="space-y-1 mt-2.5 max-h-56 overflow-y-auto pr-1">
+                  <button
+                    type="button"
+                    onClick={() => handleCategorySelect('All')}
+                    className={`w-full text-left text-xs py-1.5 px-2.5 rounded transition-colors flex items-center justify-between ${
+                      filters.category === 'All'
+                        ? 'bg-[#C1121F] text-white font-bold shadow-sm' 
+                        : 'text-white/70 hover:bg-white/5 hover:text-white'
+                    }`}
+                  >
+                    <span>All Brands & Types</span>
+                    {filters.category === 'All' && <Check className="w-3.5 h-3.5 text-white" />}
+                  </button>
+
+                  {/* Sneakers Brands */}
+                  {(!filters.department || filters.department === 'All' || filters.department === 'Sneakers') && (
+                    <>
+                      <div className="text-[10px] uppercase font-bold text-white/40 tracking-wider pt-2 pb-1 px-1">
+                        Sneaker Brands
+                      </div>
+                      {SNEAKER_BRANDS.map(brand => (
+                        <button
+                          key={brand}
+                          type="button"
+                          onClick={() => handleCategorySelect(brand)}
+                          className={`w-full text-left text-xs py-1.5 px-2.5 rounded transition-colors flex items-center justify-between ${
+                            filters.category === brand 
+                              ? 'bg-[#C1121F] text-white font-bold shadow-sm' 
+                              : 'text-white/70 hover:bg-white/5 hover:text-white'
+                          }`}
+                        >
+                          <span>{brand}</span>
+                          {filters.category === brand && <Check className="w-3.5 h-3.5 text-white" />}
+                        </button>
+                      ))}
+                    </>
+                  )}
+
+                  {/* Clothing Types */}
+                  {(!filters.department || filters.department === 'All' || filters.department === 'Clothing') && (
+                    <>
+                      <div className="text-[10px] uppercase font-bold text-white/40 tracking-wider pt-2 pb-1 px-1">
+                        Clothing Categories
+                      </div>
+                      {CLOTHING_TYPES.map(type => (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => handleCategorySelect(type)}
+                          className={`w-full text-left text-xs py-1.5 px-2.5 rounded transition-colors flex items-center justify-between ${
+                            filters.category === type 
+                              ? 'bg-[#C1121F] text-white font-bold shadow-sm' 
+                              : 'text-white/70 hover:bg-white/5 hover:text-white'
+                          }`}
+                        >
+                          <span>{type}</span>
+                          {filters.category === type && <Check className="w-3.5 h-3.5 text-white" />}
+                        </button>
+                      ))}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* 3. Gender Filter */}
+            <div className="border-b border-white/10 pb-4">
+              <button
+                type="button"
+                onClick={() => toggleSection('gender')}
+                className="w-full flex items-center justify-between text-[11px] uppercase tracking-widest text-white/70 hover:text-white font-bold py-1"
+              >
+                <span>Gender</span>
+                {collapsedSections.gender ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+              </button>
+              
+              {!collapsedSections.gender && (
+                <div className="grid grid-cols-2 gap-1.5 mt-2.5">
+                  {(['All', 'Men', 'Women', 'Unisex'] as const).map(gender => {
+                    const isSelected = (!filters.gender && gender === 'All') || filters.gender === gender;
+                    return (
+                      <button
+                        key={gender}
+                        type="button"
+                        onClick={() => handleGenderSelect(gender)}
+                        className={`py-1.5 text-xs font-semibold rounded border transition-colors ${
+                          isSelected
+                            ? 'bg-[#C1121F] border-[#C1121F] text-white font-bold'
+                            : 'bg-white/5 border-white/10 text-white/70 hover:border-white/30 hover:text-white'
+                        }`}
+                      >
+                        {gender}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* 4. Sizes */}
+            <div className="border-b border-white/10 pb-4">
+              <button
+                type="button"
+                onClick={() => toggleSection('size')}
+                className="w-full flex items-center justify-between text-[11px] uppercase tracking-widest text-white/70 hover:text-white font-bold py-1"
+              >
+                <span>Size</span>
+                {collapsedSections.size ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+              </button>
+
+              {!collapsedSections.size && (
+                <div className="space-y-3 mt-2.5">
+                  {showSneakerSizes && (
+                    <div>
+                      <div className="text-[10px] text-white/50 uppercase tracking-widest font-semibold mb-1.5">
+                        Sneakers (EU)
+                      </div>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {SNEAKER_SIZES.map(size => {
+                          const isSelected = filters.selectedSizes.map(String).includes(String(size));
+                          return (
+                            <button
+                              key={size}
+                              type="button"
+                              onClick={() => handleSizeToggle(size)}
+                              className={`py-1.5 text-xs font-bold border transition-colors rounded ${
+                                isSelected
+                                  ? 'bg-[#C1121F] border-[#C1121F] text-white shadow-sm'
+                                  : 'bg-white/5 border-white/10 text-white/70 hover:border-white/30 hover:text-white'
+                              }`}
+                            >
+                              {size}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {showClothingSizes && (
+                    <div>
+                      <div className="text-[10px] text-white/50 uppercase tracking-widest font-semibold mb-1.5">
+                        Clothing
+                      </div>
+                      <div className="grid grid-cols-5 gap-1.5">
+                        {CLOTHING_SIZES.map(size => {
+                          const isSelected = filters.selectedSizes.map(String).includes(String(size));
+                          return (
+                            <button
+                              key={size}
+                              type="button"
+                              onClick={() => handleSizeToggle(size)}
+                              className={`py-1.5 text-xs font-bold border transition-colors rounded ${
+                                isSelected
+                                  ? 'bg-[#C1121F] border-[#C1121F] text-white shadow-sm'
+                                  : 'bg-white/5 border-white/10 text-white/70 hover:border-white/30 hover:text-white'
+                              }`}
+                            >
+                              {size}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* 5. Price Range in BDT */}
             <div className="border-b border-white/10 pb-4">
               <button
                 type="button"
@@ -402,7 +647,7 @@ export const ProductGrid: React.FC = () => {
                   </div>
                   <input
                     type="range"
-                    min="2000"
+                    min="1500"
                     max="15000"
                     step="500"
                     value={filters.maxPrice}
@@ -411,21 +656,21 @@ export const ProductGrid: React.FC = () => {
                     aria-label="Filter maximum price in BDT"
                   />
                   <div className="flex justify-between text-[10px] text-white/40 font-mono">
-                    <span>৳ 2,000</span>
+                    <span>৳ 1,500</span>
                     <span>৳ 15,000</span>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* 4. Availability & Edition Flags (Collapsible) */}
+            {/* 6. Availability & Collections */}
             <div>
               <button
                 type="button"
                 onClick={() => toggleSection('availability')}
                 className="w-full flex items-center justify-between text-[11px] uppercase tracking-widest text-white/70 hover:text-white font-bold py-1"
               >
-                <span>Availability</span>
+                <span>Availability & Tags</span>
                 {collapsedSections.availability ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
               </button>
 
@@ -444,11 +689,27 @@ export const ProductGrid: React.FC = () => {
                   <label className="flex items-center gap-2.5 text-xs text-white/80 cursor-pointer select-none">
                     <input
                       type="checkbox"
+                      checked={Boolean(filters.isNewArrivalsOnly)}
+                      onChange={(e) => setFilters(prev => ({ ...prev, isNewArrivalsOnly: e.target.checked }))}
+                      className="w-4 h-4 accent-[#C7A55B] rounded"
+                    />
+                    <span className="text-[#C7A55B] font-semibold flex items-center gap-1">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      New Arrivals Only
+                    </span>
+                  </label>
+
+                  <label className="flex items-center gap-2.5 text-xs text-white/80 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
                       checked={filters.isSaleOnly}
                       onChange={(e) => setFilters(prev => ({ ...prev, isSaleOnly: e.target.checked }))}
                       className="w-4 h-4 accent-[#C1121F] rounded"
                     />
-                    <span className="text-[#C1121F] font-semibold">Sale Items Only</span>
+                    <span className="text-[#C1121F] font-semibold flex items-center gap-1">
+                      <Flame className="w-3.5 h-3.5" />
+                      Sale Items Only
+                    </span>
                   </label>
 
                   <label className="flex items-center gap-2.5 text-xs text-white/80 cursor-pointer select-none">
@@ -480,7 +741,7 @@ export const ProductGrid: React.FC = () => {
                   {currentCategoryTitle}
                 </h2>
                 <p className="text-white/50 text-xs font-light mt-0.5">
-                  Showing {Math.min(visibleCount, filteredProducts.length)} of {filteredProducts.length} handcrafted sneakers
+                  Showing {Math.min(visibleCount, filteredProducts.length)} of {filteredProducts.length} curated pieces
                 </p>
               </div>
 
@@ -525,10 +786,10 @@ export const ProductGrid: React.FC = () => {
               <div className="text-center py-16 sm:py-20 bg-[#141414] border border-white/10 p-6 sm:p-8">
                 <Filter className="w-10 h-10 sm:w-12 sm:h-12 text-[#C1121F] mx-auto mb-4 opacity-70" />
                 <h3 className="font-serif-luxury text-xl sm:text-2xl font-bold text-white mb-2">
-                  No Matching Silhouettes
+                  No Matching Items
                 </h3>
                 <p className="text-white/60 text-xs sm:text-sm mb-6 font-light max-w-md mx-auto">
-                  We couldn't find any sneakers matching your selected filters. Try broadening your criteria.
+                  We couldn't find any products matching your selected criteria. Try adjusting the department, brand, or size filters.
                 </p>
                 <button
                   onClick={resetFilters}
@@ -557,17 +818,17 @@ export const ProductGrid: React.FC = () => {
                       {isLoadingMore ? (
                         <>
                           <Loader2 className="w-4 h-4 animate-spin text-[#C7A55B]" />
-                          <span>Loading Atelier Vault...</span>
+                          <span>Loading Collection...</span>
                         </>
                       ) : (
                         <>
-                          <span>Load More Silhouettes</span>
+                          <span>Load More Items</span>
                           <ChevronDown className="w-4 h-4" />
                         </>
                       )}
                     </button>
                     <p className="text-[10px] text-white/40 font-mono mt-2">
-                      Showing {displayedProducts.length} of {filteredProducts.length} Sneakers
+                      Showing {displayedProducts.length} of {filteredProducts.length} Products
                     </p>
                   </div>
                 )}
@@ -588,8 +849,7 @@ export const ProductGrid: React.FC = () => {
       <ShopCompareDrawer />
 
       {/* ========================================================================= */}
-      {/* MOBILE & TABLET FILTER DRAWER (< 1024px) */}
-      {/* Complete filter panel with Categories, Sizes, BDT Price, In Stock, Reset */}
+      {/* MOBILE & TABLET BOTTOM SHEET / SLIDE DRAWER (< 1024px) */}
       {/* ========================================================================= */}
       <AnimatePresence>
         {isFilterDrawerOpen && (
@@ -621,7 +881,7 @@ export const ProductGrid: React.FC = () => {
                 <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-5">
                   <div className="flex items-center gap-2">
                     <SlidersHorizontal className="w-5 h-5 text-[#C7A55B]" />
-                    <h3 className="font-serif-luxury text-lg sm:text-xl font-bold">Filter Sneakers</h3>
+                    <h3 className="font-serif-luxury text-lg sm:text-xl font-bold">Filters</h3>
                     {activeFilterCount > 0 && (
                       <span className="w-5 h-5 rounded-full bg-[#C1121F] text-white text-[10px] font-bold flex items-center justify-center">
                         {activeFilterCount}
@@ -638,48 +898,141 @@ export const ProductGrid: React.FC = () => {
                 </div>
 
                 <div className="space-y-5">
-                  {/* Category Picker */}
+                  {/* Department */}
                   <div>
                     <label className="text-xs uppercase tracking-widest text-white/60 font-semibold block mb-2">
-                      Category
+                      Department
                     </label>
-                    <select
-                      value={filters.category}
-                      onChange={(e) => handleCategorySelect(e.target.value as any)}
-                      className="w-full px-3.5 py-3 bg-[#1C1C1C] border border-white/15 text-white text-xs font-semibold uppercase focus:outline-none focus:border-[#C1121F] min-h-[44px]"
-                      aria-label="Filter by category"
-                    >
-                      {CATEGORIES.map(cat => (
-                        <option key={cat} value={cat}>{cat}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Shoe Size Selection */}
-                  <div>
-                    <label className="text-xs uppercase tracking-widest text-white/60 font-semibold block mb-2">
-                      Shoe Size (EU)
-                    </label>
-                    <div className="grid grid-cols-4 gap-2">
-                      {AVAILABLE_SIZES.map(size => {
-                        const isSelected = filters.selectedSizes.includes(size);
+                    <div className="grid grid-cols-3 gap-2">
+                      {(['All', 'Sneakers', 'Clothing'] as const).map(dept => {
+                        const isSelected = (!filters.department && dept === 'All') || filters.department === dept;
                         return (
                           <button
-                            key={size}
+                            key={dept}
                             type="button"
-                            onClick={() => handleSizeToggle(size)}
-                            className={`py-2.5 text-xs font-bold border transition-colors rounded min-h-[40px] flex items-center justify-center ${
-                              isSelected 
-                                ? 'bg-[#C1121F] border-[#C1121F] text-white shadow-sm' 
+                            onClick={() => handleDepartmentSelect(dept)}
+                            className={`py-2.5 text-xs font-semibold rounded border transition-colors min-h-[40px] ${
+                              isSelected
+                                ? 'bg-[#C1121F] border-[#C1121F] text-white font-bold'
                                 : 'bg-white/5 border-white/10 text-white/70 hover:border-white/30'
                             }`}
                           >
-                            EU {size}
+                            {dept}
                           </button>
                         );
                       })}
                     </div>
                   </div>
+
+                  {/* Brand / Type Selector */}
+                  <div>
+                    <label className="text-xs uppercase tracking-widest text-white/60 font-semibold block mb-2">
+                      {filters.department === 'Clothing' ? 'Clothing Type' : filters.department === 'Sneakers' ? 'Sneaker Brand' : 'Brand / Type'}
+                    </label>
+                    <select
+                      value={filters.category}
+                      onChange={(e) => handleCategorySelect(e.target.value as any)}
+                      className="w-full px-3.5 py-3 bg-[#1C1C1C] border border-white/15 text-white text-xs font-semibold uppercase focus:outline-none focus:border-[#C1121F] min-h-[44px]"
+                      aria-label="Filter by brand or clothing type"
+                    >
+                      <option value="All">All Brands & Types</option>
+                      {(!filters.department || filters.department === 'All' || filters.department === 'Sneakers') && (
+                        <optgroup label="Sneaker Brands">
+                          {SNEAKER_BRANDS.map(brand => (
+                            <option key={brand} value={brand}>{brand}</option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {(!filters.department || filters.department === 'All' || filters.department === 'Clothing') && (
+                        <optgroup label="Clothing Categories">
+                          {CLOTHING_TYPES.map(type => (
+                            <option key={type} value={type}>{type}</option>
+                          ))}
+                        </optgroup>
+                      )}
+                    </select>
+                  </div>
+
+                  {/* Gender Selector */}
+                  <div>
+                    <label className="text-xs uppercase tracking-widest text-white/60 font-semibold block mb-2">
+                      Gender
+                    </label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {(['All', 'Men', 'Women', 'Unisex'] as const).map(g => {
+                        const isSelected = (!filters.gender && g === 'All') || filters.gender === g;
+                        return (
+                          <button
+                            key={g}
+                            type="button"
+                            onClick={() => handleGenderSelect(g)}
+                            className={`py-2 text-xs font-semibold rounded border transition-colors min-h-[38px] ${
+                              isSelected
+                                ? 'bg-[#C1121F] border-[#C1121F] text-white font-bold'
+                                : 'bg-white/5 border-white/10 text-white/70 hover:border-white/30'
+                            }`}
+                          >
+                            {g}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Sizes (Contextual) */}
+                  {showSneakerSizes && (
+                    <div>
+                      <label className="text-xs uppercase tracking-widest text-white/60 font-semibold block mb-2">
+                        Sneakers Size (EU)
+                      </label>
+                      <div className="grid grid-cols-4 gap-2">
+                        {SNEAKER_SIZES.map(size => {
+                          const isSelected = filters.selectedSizes.map(String).includes(String(size));
+                          return (
+                            <button
+                              key={size}
+                              type="button"
+                              onClick={() => handleSizeToggle(size)}
+                              className={`py-2 text-xs font-bold border transition-colors rounded min-h-[38px] flex items-center justify-center ${
+                                isSelected 
+                                  ? 'bg-[#C1121F] border-[#C1121F] text-white shadow-sm' 
+                                  : 'bg-white/5 border-white/10 text-white/70 hover:border-white/30'
+                              }`}
+                            >
+                              EU {size}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {showClothingSizes && (
+                    <div>
+                      <label className="text-xs uppercase tracking-widest text-white/60 font-semibold block mb-2">
+                        Clothing Size
+                      </label>
+                      <div className="grid grid-cols-5 gap-2">
+                        {CLOTHING_SIZES.map(size => {
+                          const isSelected = filters.selectedSizes.map(String).includes(String(size));
+                          return (
+                            <button
+                              key={size}
+                              type="button"
+                              onClick={() => handleSizeToggle(size)}
+                              className={`py-2 text-xs font-bold border transition-colors rounded min-h-[38px] flex items-center justify-center ${
+                                isSelected 
+                                  ? 'bg-[#C1121F] border-[#C1121F] text-white shadow-sm' 
+                                  : 'bg-white/5 border-white/10 text-white/70 hover:border-white/30'
+                              }`}
+                            >
+                              {size}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Price Range Slider in BDT */}
                   <div>
@@ -689,7 +1042,7 @@ export const ProductGrid: React.FC = () => {
                     </div>
                     <input
                       type="range"
-                      min="2000"
+                      min="1500"
                       max="15000"
                       step="500"
                       value={filters.maxPrice}
@@ -698,7 +1051,7 @@ export const ProductGrid: React.FC = () => {
                       aria-label="Filter maximum price in BDT"
                     />
                     <div className="flex justify-between text-[10px] text-white/40 font-mono mt-1">
-                      <span>৳ 2,000</span>
+                      <span>৳ 1,500</span>
                       <span>৳ 15,000</span>
                     </div>
                   </div>
@@ -713,6 +1066,16 @@ export const ProductGrid: React.FC = () => {
                         className="w-4 h-4 accent-[#C1121F] rounded"
                       />
                       <span>In-Stock Only</span>
+                    </label>
+
+                    <label className="flex items-center gap-2.5 text-xs text-white/80 cursor-pointer min-h-[36px]">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(filters.isNewArrivalsOnly)}
+                        onChange={(e) => setFilters(prev => ({ ...prev, isNewArrivalsOnly: e.target.checked }))}
+                        className="w-4 h-4 accent-[#C7A55B] rounded"
+                      />
+                      <span className="text-[#C7A55B] font-semibold">New Arrivals Only</span>
                     </label>
 
                     <label className="flex items-center gap-2.5 text-xs text-white/80 cursor-pointer min-h-[36px]">

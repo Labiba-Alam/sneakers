@@ -148,67 +148,169 @@ export const MobileNav: React.FC<MobileNavProps> = ({
               </button>
             </div>
 
-            {/* Main Menu Links (16px Medium, min 44px touch targets) */}
-            <nav aria-label="Mobile Navigation" className="space-y-1">
+            {/* Main Menu Links */}
+            <nav aria-label="Mobile Navigation" className="space-y-3">
               
-              {/* 1. Shop */}
-              <button
-                onClick={() => handleNavClick(undefined, 'catalog')}
-                className="w-full min-h-[44px] px-3 py-2.5 rounded-lg flex items-center justify-between text-[16px] font-medium text-[#111111] hover:bg-black/5 hover:text-[#C1121F] transition-colors text-left"
-              >
-                <span>Shop</span>
-                <ChevronRight className="w-4 h-4 text-[#111111]/30" />
-              </button>
-
-              {/* 2. Men */}
-              <button
-                onClick={() => handleNavClick('Men Sneakers', 'catalog')}
-                className="w-full min-h-[44px] px-3 py-2.5 rounded-lg flex items-center justify-between text-[16px] font-medium text-[#111111] hover:bg-black/5 hover:text-[#C1121F] transition-colors text-left"
-              >
-                <span>Men</span>
-                <ChevronRight className="w-4 h-4 text-[#111111]/30" />
-              </button>
-
-              {/* 3. Women */}
-              <button
-                onClick={() => handleNavClick('Women Sneakers', 'catalog')}
-                className="w-full min-h-[44px] px-3 py-2.5 rounded-lg flex items-center justify-between text-[16px] font-medium text-[#111111] hover:bg-black/5 hover:text-[#C1121F] transition-colors text-left"
-              >
-                <span>Women</span>
-                <ChevronRight className="w-4 h-4 text-[#111111]/30" />
-              </button>
-
-              {/* 4. Sale */}
-              <button
-                onClick={() => handleNavClick(undefined, 'catalog', true)}
-                className="w-full min-h-[44px] px-3 py-2.5 rounded-lg flex items-center justify-between text-[16px] font-bold text-[#C1121F] hover:bg-[#C1121F]/5 transition-colors text-left"
-              >
-                <span className="flex items-center gap-2">
-                  <span>Sale</span>
-                  <span className="px-1.5 py-0.5 bg-[#C1121F] text-white text-[9px] font-black uppercase rounded">
-                    Drops
+              {/* SNEAKERS SECTION */}
+              <div className="bg-[#F8F8F8] p-3 rounded-lg border border-black/5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-[#C1121F] flex items-center gap-1.5">
+                    <span>Sneakers</span>
                   </span>
-                </span>
-                <ChevronRight className="w-4 h-4 text-[#C1121F]/60" />
-              </button>
+                  <button
+                    onClick={() => {
+                      setFilters(prev => ({ ...prev, department: 'Sneakers', category: 'All', brand: 'All', isSaleOnly: false }));
+                      setView('catalog');
+                      onClose();
+                    }}
+                    className="text-[10px] text-gray-500 hover:text-black font-semibold uppercase"
+                  >
+                    All &rarr;
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {['Nike', 'Jordan', 'Adidas', 'New Balance', 'Converse', 'Louis Vuitton'].map((brand) => (
+                    <button
+                      key={brand}
+                      onClick={() => {
+                        setFilters(prev => ({
+                          ...prev,
+                          department: 'Sneakers',
+                          brand: brand as any,
+                          category: brand as any,
+                          isSaleOnly: false,
+                        }));
+                        setView('catalog');
+                        onClose();
+                      }}
+                      className="px-2.5 py-1.5 text-left text-xs font-semibold text-[#111111] bg-white border border-black/5 hover:border-[#C1121F] rounded transition-colors"
+                    >
+                      {brand}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-              {/* 5. About */}
-              <button
-                onClick={() => handleNavClick(undefined, 'brand-story')}
-                className="w-full min-h-[44px] px-3 py-2.5 rounded-lg flex items-center justify-between text-[16px] font-medium text-[#111111] hover:bg-black/5 hover:text-[#C1121F] transition-colors text-left"
-              >
-                <span>About</span>
-                <ChevronRight className="w-4 h-4 text-[#111111]/30" />
-              </button>
+              {/* CLOTHING SECTION */}
+              <div className="bg-[#F8F8F8] p-3 rounded-lg border border-black/5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-[#111111] flex items-center gap-1.5">
+                    <span>Clothing</span>
+                  </span>
+                  <button
+                    onClick={() => {
+                      setFilters(prev => ({ ...prev, department: 'Clothing', category: 'All', clothingType: 'All', isSaleOnly: false }));
+                      setView('catalog');
+                      onClose();
+                    }}
+                    className="text-[10px] text-gray-500 hover:text-black font-semibold uppercase"
+                  >
+                    All &rarr;
+                  </button>
+                </div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {['T-Shirt', 'Hoodie', 'Sweatshirt'].map((type) => (
+                    <button
+                      key={type}
+                      onClick={() => {
+                        setFilters(prev => ({
+                          ...prev,
+                          department: 'Clothing',
+                          clothingType: type as any,
+                          category: type as any,
+                          isSaleOnly: false,
+                        }));
+                        setView('catalog');
+                        onClose();
+                      }}
+                      className="px-2 py-1.5 text-center text-xs font-semibold text-[#111111] bg-white border border-black/5 hover:border-[#C1121F] rounded transition-colors"
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-              {/* 6. Contact */}
-              <button
-                onClick={() => handleNavClick(undefined, 'contact')}
-                className="w-full min-h-[44px] px-3 py-2.5 rounded-lg flex items-center justify-between text-[16px] font-medium text-[#111111] hover:bg-black/5 hover:text-[#C1121F] transition-colors text-left"
-              >
-                <span>Contact</span>
-                <ChevronRight className="w-4 h-4 text-[#111111]/30" />
-              </button>
+              {/* Collections & Filters */}
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  onClick={() => {
+                    setFilters(prev => ({ ...prev, isNewArrivalsOnly: true, isSaleOnly: false }));
+                    setView('catalog');
+                    onClose();
+                  }}
+                  className="px-3 py-2 bg-[#C7A55B]/10 border border-[#C7A55B]/30 rounded text-xs font-bold text-[#111111] flex items-center justify-center gap-1.5"
+                >
+                  <span>✨ New Arrivals</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setFilters(prev => ({ ...prev, isSaleOnly: true, isNewArrivalsOnly: false }));
+                    setView('catalog');
+                    onClose();
+                  }}
+                  className="px-3 py-2 bg-[#C1121F]/10 border border-[#C1121F]/30 rounded text-xs font-bold text-[#C1121F] flex items-center justify-center gap-1.5"
+                >
+                  <span>🏷️ Sale Drops</span>
+                </button>
+              </div>
+
+              {/* Gender Filters */}
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  onClick={() => {
+                    setFilters(prev => ({ ...prev, gender: 'Men', isSaleOnly: false }));
+                    setView('catalog');
+                    onClose();
+                  }}
+                  className="flex-1 py-2 bg-black/5 hover:bg-black/10 rounded text-xs font-semibold text-[#111111] text-center"
+                >
+                  Men
+                </button>
+                <button
+                  onClick={() => {
+                    setFilters(prev => ({ ...prev, gender: 'Women', isSaleOnly: false }));
+                    setView('catalog');
+                    onClose();
+                  }}
+                  className="flex-1 py-2 bg-black/5 hover:bg-black/10 rounded text-xs font-semibold text-[#111111] text-center"
+                >
+                  Women
+                </button>
+                <button
+                  onClick={() => {
+                    setFilters(prev => ({ ...prev, gender: 'Unisex', isSaleOnly: false }));
+                    setView('catalog');
+                    onClose();
+                  }}
+                  className="flex-1 py-2 bg-black/5 hover:bg-black/10 rounded text-xs font-semibold text-[#111111] text-center"
+                >
+                  Unisex
+                </button>
+              </div>
+
+              {/* About & Contact */}
+              <div className="pt-2 border-t border-black/10 flex justify-between text-xs text-gray-600 font-medium px-1">
+                <button
+                  onClick={() => {
+                    setView('brand-story');
+                    onClose();
+                  }}
+                  className="hover:text-black py-1"
+                >
+                  Brand Story
+                </button>
+                <button
+                  onClick={() => {
+                    setView('contact');
+                    onClose();
+                  }}
+                  className="hover:text-black py-1"
+                >
+                  Concierge & Contact
+                </button>
+              </div>
 
               {/* Divider */}
               <div className="pt-2 pb-2">

@@ -31,7 +31,6 @@ export type AdminTab =
   | 'reviews'
   | 'analytics'
   | 'marketing'
-  | 'marketing_insights'
   | 'settings';
 
 interface AdminSidebarProps {
@@ -90,7 +89,6 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
     },
     { id: 'analytics', label: 'Analytics & Reports', icon: <BarChart3 className="w-4 h-4" /> },
     { id: 'marketing', label: 'Marketing & SEO', icon: <Megaphone className="w-4 h-4" /> },
-    { id: 'marketing_insights', label: 'AI Marketing Insights', icon: <Sparkles className="w-4 h-4 text-[#C7A55B]" /> },
     { id: 'settings', label: 'Store Settings', icon: <Settings className="w-4 h-4" /> },
   ];
 

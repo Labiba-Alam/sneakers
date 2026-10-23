@@ -16,7 +16,6 @@ const AdminCoupons = lazy(() => import('./admin/AdminCoupons').then(m => ({ defa
 const AdminReviews = lazy(() => import('./admin/AdminReviews').then(m => ({ default: m.AdminReviews })));
 const AdminAnalytics = lazy(() => import('./admin/AdminAnalytics').then(m => ({ default: m.AdminAnalytics })));
 const AdminMarketing = lazy(() => import('./admin/AdminMarketing').then(m => ({ default: m.AdminMarketing })));
-const AdminMarketingInsights = lazy(() => import('./admin/AdminMarketingInsights').then(m => ({ default: m.AdminMarketingInsights })));
 const AdminSettings = lazy(() => import('./admin/AdminSettings').then(m => ({ default: m.AdminSettings })));
 const AdminNotificationsModal = lazy(() => import('./admin/AdminNotificationsModal').then(m => ({ default: m.AdminNotificationsModal })));
 const AdminGlobalSearchModal = lazy(() => import('./admin/AdminGlobalSearchModal').then(m => ({ default: m.AdminGlobalSearchModal })));
@@ -29,7 +28,7 @@ const AdminTabFallback: React.FC = () => (
 );
 
 export const AdminDashboard: React.FC = () => {
-  const { products, setProducts, allOrders, updateOrderStatus, setView, showToast } = useStore();
+  const { products, setProducts, allOrders, setAllOrders, updateOrderStatus, setView, showToast } = useStore();
   
   // Authentication & Session State - Require verified server-side session
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -96,6 +95,13 @@ export const AdminDashboard: React.FC = () => {
   useEffect(() => {
     if (!isAuthenticated) return;
 
+    fetch('/api/admin/orders', { credentials: 'include' })
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) setAllOrders(data);
+      })
+      .catch(() => {});
+
     fetch('/api/admin/coupons', { credentials: 'include' })
       .then(res => res.json())
       .then(data => {
@@ -109,7 +115,7 @@ export const AdminDashboard: React.FC = () => {
         if (Array.isArray(data)) setInventoryLogs(data);
       })
       .catch(() => {});
-  }, [isAuthenticated]);
+  }, [isAuthenticated, setAllOrders]);
 
   // Notifications State
   const [notifications, setNotifications] = useState<AdminNotification[]>([
@@ -134,7 +140,7 @@ export const AdminDashboard: React.FC = () => {
     {
       id: 'notif-3',
       title: 'New Customer Testimonial',
-      message: 'Labiba A. left a 5-star review for High Tops.',
+      message: 'A verified customer left a 5-star review for Air Jordan 1 Retro.',
       type: 'message',
       timestamp: '1 hour ago',
       isRead: true,
@@ -390,10 +396,6 @@ export const AdminDashboard: React.FC = () => {
 
             {currentTab === 'marketing' && (
               <AdminMarketing />
-            )}
-
-            {currentTab === 'marketing_insights' && (
-              <AdminMarketingInsights orders={allOrders} products={products} />
             )}
 
             {currentTab === 'settings' && (

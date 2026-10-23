@@ -1,53 +1,100 @@
 import React from 'react';
-import { Sparkles, Crown, ArrowRight } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { useStore } from '../../context/StoreContext';
 
 export const ShopHeroBanner: React.FC = () => {
   const { filters } = useStore();
 
   const getBannerContent = () => {
+    if (filters.isSaleOnly) {
+      return {
+        title: 'EXCLUSIVE SALE ARCHIVE',
+        subtitle: 'Privilege reductions on authentic footwear and luxury apparel',
+        badge: 'Limited Reductions'
+      };
+    }
+    if (filters.isNewArrivalsOnly) {
+      return {
+        title: 'NEW ARRIVALS DROP',
+        subtitle: 'The latest seasonal acquisitions fresh from Florence atelier',
+        badge: 'Just Landed'
+      };
+    }
+
     switch (filters.category) {
-      case 'Limited Edition':
+      case 'Nike':
         return {
-          title: 'LIMITED EDITION VAULT',
-          subtitle: 'Minted Florence Silhouettes • 24K Gold Hardware • Certified Numbered Pairs',
-          accent: 'text-[#C7A55B]',
-          badge: 'Exclusive Drops'
+          title: 'NIKE HERITAGE & INNOVATION',
+          subtitle: 'Air Max, Dunk Low, and iconic silhouettes crafted with premium materials',
+          badge: 'Iconic Athleisure'
         };
-      case 'Running':
+      case 'Jordan':
         return {
-          title: 'HIGH PERFORMANCE RUNNING',
-          subtitle: 'Engineered Vibram Outsoles & Ergonomic Carbon Fibre Cushioning',
-          accent: 'text-[#C1121F]',
-          badge: 'Athletic Luxury'
+          title: 'AIR JORDAN ARCHIVE',
+          subtitle: 'Retro Highs, championship legacies, and premium Italian leather finishes',
+          badge: 'Court Royalty'
         };
-      case 'Basketball':
+      case 'Adidas':
         return {
-          title: 'COURT ARCHITECTURE',
-          subtitle: 'Ankle Stability & Micro-Perforated Italian Calfskin Uppers',
-          accent: 'text-[#C7A55B]',
-          badge: 'Pro Performance'
+          title: 'ADIDAS ORIGINALS & PERFORMANCE',
+          subtitle: 'Terrace culture classics and contemporary comfort silhouettes',
+          badge: 'Three Stripes Heritage'
         };
-      case 'High Tops':
+      case 'New Balance':
         return {
-          title: 'HIGH TOP HERITAGE',
-          subtitle: 'Hand-burnished Tuscan Leather High-Tops for Statement Elevation',
-          accent: 'text-white',
-          badge: 'Statement Silhouette'
+          title: 'NEW BALANCE HERITAGE',
+          subtitle: 'Timeless lifestyle running designs built on ergonomic support and prestige suede',
+          badge: 'Classic Craft'
         };
-      case 'Low Tops':
+      case 'Converse':
         return {
-          title: 'ESSENTIAL LOW TOPS',
-          subtitle: 'Minimalist Modern Classic Footwear for Everyday Royalty',
-          accent: 'text-white',
-          badge: 'Daily Essential'
+          title: 'CONVERSE STATEMENT CHUCKS',
+          subtitle: 'Deconstructed 70s canvas elevations with luxury vulcanized accents',
+          badge: 'Enduring Silhouette'
+        };
+      case 'Louis Vuitton':
+        return {
+          title: 'LOUIS VUITTON MAISON FOOTWEAR',
+          subtitle: 'Artisanal runway craftsmanship, monogram embossing, and calf leather luxury',
+          badge: 'Haute Horlogerie & Fashion'
+        };
+      case 'T-Shirt':
+        return {
+          title: 'LUXURY ESSENTIAL T-SHIRTS',
+          subtitle: 'Heavyweight organic combed cotton with tailored streetwear drape',
+          badge: 'Wardrobe Foundation'
+        };
+      case 'Hoodie':
+        return {
+          title: 'PREMIUM OVERSIZED HOODIES',
+          subtitle: 'French terry fleece, brushed interior warmth, and minimalist branding',
+          badge: 'Cold Season Essential'
+        };
+      case 'Sweatshirt':
+        return {
+          title: 'HERITAGE CREWNECK SWEATSHIRTS',
+          subtitle: 'Double-stitched structural tailoring for enduring leisure comfort',
+          badge: 'Subtle Sophistication'
         };
       default:
+        if (filters.department === 'Sneakers') {
+          return {
+            title: 'SNEAKERS COLLECTION',
+            subtitle: 'Curated international brands: Nike, Jordan, Adidas, New Balance, Converse, and Louis Vuitton',
+            badge: 'Footwear Atelier'
+          };
+        }
+        if (filters.department === 'Clothing') {
+          return {
+            title: 'CLOTHING & APPAREL',
+            subtitle: 'Heavyweight luxury basics: T-Shirts, Hoodies, and Sweatshirts engineered for distinction',
+            badge: 'Apparel Studio'
+          };
+        }
         return {
-          title: 'ROYAL SNEAKER ARCHIVE',
-          subtitle: 'Handcrafted by Master Artisans in Florence using Tuscan Leather & 24K Gold Hardware',
-          accent: 'text-[#C7A55B]',
-          badge: 'Autumn / Winter MMXXVI'
+          title: 'KINGSMAN LUXURY ARCHIVE',
+          subtitle: 'Handcrafted luxury sneakers and bespoke streetwear curated for Dhaka connoisseurs',
+          badge: 'Current Season'
         };
     }
   };
@@ -78,8 +125,8 @@ export const ShopHeroBanner: React.FC = () => {
         {/* Desktop Quick Badge */}
         <div className="hidden lg:block shrink-0">
           <div className="text-right">
-            <span className="text-[10px] text-[#C7A55B] uppercase tracking-widest font-mono block">Authentic Florentine Import</span>
-            <span className="text-xs text-white/50">Inspected & Delivered in Dhaka</span>
+            <span className="text-[10px] text-[#C7A55B] uppercase tracking-widest font-mono block">Authentic Luxury Import</span>
+            <span className="text-xs text-white/50">Verified & Delivered in Dhaka</span>
           </div>
         </div>
       </div>
