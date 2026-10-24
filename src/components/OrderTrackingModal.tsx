@@ -63,25 +63,33 @@ export const OrderTrackingModal: React.FC = () => {
   };
 
   const STATUS_STEPS: { status: OrderStatus; label: string; desc: string }[] = [
-    { status: 'Pending', label: 'Order Placed', desc: 'Order logged into KINGSMAN dispatch queue.' },
-    { status: 'Confirmed', label: 'Confirmed', desc: 'Order confirmed and scheduled for packaging.' },
-    { status: 'Packaging', label: 'Packaging', desc: 'Atelier master craftsman inspecting & boxing footwear.' },
-    { status: 'Ready for Pickup', label: 'Ready for Courier', desc: 'Handed to express logistics hub.' },
-    { status: 'Shipped', label: 'Shipped', desc: 'In transit with courier to your destination.' },
-    { status: 'Delivered', label: 'Delivered', desc: 'Successfully delivered to recipient.' }
+    { status: 'Awaiting Delivery Charge', label: 'Awaiting Advance Delivery Charge', desc: 'Awaiting advance delivery charge payment via bKash, Nagad, or Rocket.' },
+    { status: 'Confirmed', label: 'Order Confirmed', desc: 'Advance delivery charge received and verified by KINGSMAN.' },
+    { status: 'Packed', label: 'Parcel Packed', desc: 'Quality checked, packaged and ready for courier pickup.' },
+    { status: 'Handed to Courier', label: 'Handed to Courier', desc: 'In transit with Steadfast or Pathao logistics.' },
+    { status: 'Delivered', label: 'Delivered', desc: 'Successfully delivered to customer. COD collected.' }
   ];
 
   const getStepProgressIndex = (status: OrderStatus) => {
     switch (status) {
-      case 'Pending': return 0;
-      case 'Confirmed': return 1;
-      case 'Packaging': return 2;
-      case 'Ready for Pickup': return 3;
-      case 'Shipped': return 4;
-      case 'Delivered': return 5;
-      case 'Cancelled': return -1;
-      case 'Returned': return -1;
-      default: return 0;
+      case 'Awaiting Delivery Charge':
+      case 'Pending':
+        return 0;
+      case 'Confirmed':
+        return 1;
+      case 'Packed':
+      case 'Packaging':
+        return 2;
+      case 'Handed to Courier':
+      case 'Shipped':
+        return 3;
+      case 'Delivered':
+        return 4;
+      case 'Cancelled':
+      case 'Returned':
+        return -1;
+      default:
+        return 0;
     }
   };
 
@@ -183,33 +191,58 @@ export const OrderTrackingModal: React.FC = () => {
                     Recipient: {trackedOrder.customerName} • {trackedOrder.district || trackedOrder.city}
                   </p>
                   <p className="text-[11px] text-white/50 mt-0.5">
-                    Courier: {trackedOrder.courierPartner || 'Steadfast'} Express
+                    Courier: {trackedOrder.courierName || trackedOrder.courierPartner || 'Steadfast'} Express
+                    {trackedOrder.consignmentId ? ` • Consignment: ${trackedOrder.consignmentId}` : ''}
                   </p>
                 </div>
                 <div className="text-left sm:text-right">
-                  <span className="px-3 py-1 bg-[#C1121F] text-white text-[10px] uppercase font-bold tracking-widest">
+                  <span className="px-3 py-1 bg-[#C1121F] text-white text-[10px] uppercase font-bold tracking-widest inline-block">
                     {trackedOrder.orderStatus}
                   </span>
-                  <p className="text-[10px] font-mono text-white/50 mt-1">
-                    Tracking: {trackedOrder.trackingNumber || 'TRK-ASSIGNED'}
-                  </p>
+                  <div className="mt-1">
+                    {trackedOrder.deliveryChargePaid ? (
+                      <span className="text-[10px] text-emerald-400 font-semibold block">
+                        ✓ Delivery Charge Received
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-amber-400 font-semibold block">
+                        ⏳ Awaiting Delivery Charge (৳{trackedOrder.shippingFee})
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 
               {/* Items Breakdown */}
               <div className="space-y-2">
-                <p className="text-[10px] uppercase tracking-wider text-white/50 font-semibold">Ordered Footwear</p>
+                <p className="text-[10px] uppercase tracking-wider text-white/50 font-semibold">Ordered Items</p>
                 <div className="space-y-2">
                   {trackedOrder.items.map((item, i) => (
                     <div key={i} className="flex justify-between items-center text-xs text-white/80 py-1 border-b border-white/5">
-                      <span>{item.product.name} (EU {item.selectedSize}) × {item.quantity}</span>
+                      <span>{item.product.name} (Size: {item.selectedSize}) × {item.quantity}</span>
                       <span className="font-mono text-white">৳{(item.product.price * item.quantity).toLocaleString()}</span>
                     </div>
                   ))}
                 </div>
-                <div className="pt-2 flex justify-between text-xs text-[#C7A55B] font-bold">
-                  <span>Grand Total:</span>
-                  <span className="font-mono">৳{trackedOrder.total.toLocaleString()}</span>
+                <div className="pt-2 space-y-1 text-xs border-t border-white/10">
+                  <div className="flex justify-between text-white/70">
+                    <span>Products Subtotal:</span>
+                    <span className="font-mono">৳{trackedOrder.subtotal.toLocaleString()}</span>
+                  </div>
+                  {trackedOrder.discountAmount > 0 && (
+                    <div className="flex justify-between text-emerald-400">
+                      <span>Discount:</span>
+                      <span className="font-mono">-৳{trackedOrder.discountAmount.toLocaleString()}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-white/70">
+                    <span>Delivery Charge:</span>
+                    <span className="font-mono">৳{trackedOrder.shippingFee}</span>
+                  </div>
+                  <div className="flex justify-between text-[#C7A55B] font-bold pt-1 border-t border-white/10">
+                    <span>Pay on Delivery (COD):</span>
+                    <span className="font-mono text-sm">৳{(trackedOrder.codAmountToCollect ?? (trackedOrder.subtotal - trackedOrder.discountAmount)).toLocaleString()}</span>
+                  </div>
                 </div>
               </div>
 

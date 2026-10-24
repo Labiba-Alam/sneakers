@@ -59,33 +59,25 @@ export const DeliveryAndPayments: React.FC = () => {
       {/* Payment Gateway Badges */}
       <div className="bg-white/5 border border-white/10 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <span className="text-[10px] uppercase tracking-widest text-white/60 font-bold shrink-0">
-          Accepted Payment Gateways:
+          Payment Process:
         </span>
 
         <div className="flex items-center gap-2 flex-wrap">
+          {/* COD */}
+          <span className="px-2 py-1 bg-[#1A1A1A] text-[#C7A55B] font-bold text-[10px] tracking-wider border border-[#C7A55B]/40">
+            Cash on Delivery (COD)
+          </span>
           {/* bKash */}
-          <span className="px-2 py-1 bg-[#E2136E] text-white font-bold text-[10px] tracking-wider rounded-none">
-            bKash
+          <span className="px-2 py-1 bg-[#E2136E] text-white font-bold text-[10px] tracking-wider">
+            bKash Advance
           </span>
           {/* Nagad */}
-          <span className="px-2 py-1 bg-[#F7931E] text-white font-bold text-[10px] tracking-wider rounded-none">
-            Nagad
+          <span className="px-2 py-1 bg-[#F7931E] text-white font-bold text-[10px] tracking-wider">
+            Nagad Advance
           </span>
           {/* Rocket */}
-          <span className="px-2 py-1 bg-[#8C3494] text-white font-bold text-[10px] tracking-wider rounded-none">
-            Rocket
-          </span>
-          {/* Visa */}
-          <span className="px-2 py-1 bg-[#1A1F71] text-white font-bold text-[10px] tracking-wider border border-white/20">
-            VISA
-          </span>
-          {/* Mastercard */}
-          <span className="px-2 py-1 bg-[#EB001B] text-white font-bold text-[10px] tracking-wider">
-            Mastercard
-          </span>
-          {/* SSLCommerz */}
-          <span className="px-2 py-1 bg-[#2C3E50] text-[#C7A55B] font-bold text-[10px] tracking-wider border border-[#C7A55B]/40">
-            SSLCommerz Secured
+          <span className="px-2 py-1 bg-[#8C3494] text-white font-bold text-[10px] tracking-wider">
+            Rocket Advance
           </span>
         </div>
       </div>

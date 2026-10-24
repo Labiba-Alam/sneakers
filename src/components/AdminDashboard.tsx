@@ -131,7 +131,7 @@ export const AdminDashboard: React.FC = () => {
     {
       id: 'notif-2',
       title: 'New VIP Order #KNG-9014',
-      message: 'Marcus Sterling placed order for $450 via SSLCommerz.',
+      message: 'Marcus Sterling placed order for ৳14,500 (Awaiting delivery charge via bKash).',
       type: 'new_order',
       timestamp: '25 mins ago',
       isRead: false,

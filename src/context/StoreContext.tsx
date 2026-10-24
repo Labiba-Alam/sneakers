@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { Product, CartItem, Order, Coupon, FilterState, Currency, ViewState, CategoryType, CustomerAccount } from '../types';
+import { Product, CartItem, Order, Coupon, FilterState, Currency, ViewState, CategoryType, CustomerAccount, StoreSettings } from '../types';
 import { INITIAL_PRODUCTS } from '../data/products';
 import { 
   trackPageView, 
@@ -15,6 +15,17 @@ interface Toast {
   message: string;
   type: 'success' | 'info' | 'error';
 }
+
+export const DEFAULT_STORE_SETTINGS: StoreSettings = {
+  bkashNumber: '01581054939',
+  nagadNumber: '01581054939',
+  rocketNumber: '01581054939',
+  whatsappNumber: '01581054939',
+  deliveryChargeInsideDhaka: 100,
+  deliveryChargeOutsideDhaka: 160,
+  baseWeightGrams: 1000,
+  extraChargePerKg: 0,
+};
 
 interface StoreContextType {
   // Navigation & View
@@ -45,7 +56,10 @@ interface StoreContextType {
   applyCoupon: (code: string) => Promise<{ success: boolean; message: string }>;
   removeCoupon: () => void;
   
-  // Financial Computations
+  // Financial Computations & Settings
+  settings: StoreSettings;
+  updateSettings: (newSettings: Partial<StoreSettings>) => Promise<boolean>;
+  calculateShippingFee: (districtName: string, itemsList?: CartItem[]) => number;
   subtotal: number;
   discountAmount: number;
   shippingFee: number;
@@ -77,6 +91,8 @@ interface StoreContextType {
   setAllOrders: React.Dispatch<React.SetStateAction<Order[]>>;
   placeOrder: (orderData: Partial<Order>) => Promise<Order>;
   updateOrderStatus: (orderId: string, status: Order['orderStatus']) => Promise<void>;
+  markDeliveryChargeReceived: (orderId: string) => Promise<boolean>;
+  updateCourierBooking: (orderId: string, courierName: 'Steadfast' | 'Pathao', consignmentId: string, codAmount?: number) => Promise<boolean>;
   
   // Toasts
   toasts: Toast[];
@@ -161,6 +177,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   });
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
 
+  const [settings, setSettings] = useState<StoreSettings>(DEFAULT_STORE_SETTINGS);
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
   const [currency, setCurrency] = useState<Currency>('BDT');
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -187,7 +204,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.setItem('kingsman_wishlist', JSON.stringify(wishlist));
   }, [wishlist]);
 
-  // Sync initial products from server and handle payment return callbacks
+  // Sync initial products & settings from server
   useEffect(() => {
     fetch('/api/products')
       .then(res => res.json())
@@ -196,40 +213,16 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           setProducts(data);
         }
       })
-      .catch(() => {
-        // Fallback to initial local products
-      });
+      .catch(() => {});
 
-    // Check if returning from SSLCommerz Payment Gateway
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const orderId = params.get('order_id');
-      const payment = params.get('payment');
-
-      if (orderId) {
-        if (payment === 'success') {
-          fetch(`/api/orders?orderId=${encodeURIComponent(orderId)}`)
-            .then(res => res.json())
-            .then(data => {
-              if (Array.isArray(data) && data.length > 0) {
-                const confirmedOrder = data[0];
-                setActiveOrder(confirmedOrder);
-                setView('order-confirmation');
-                setCart([]);
-                setAppliedCoupon(null);
-                trackPurchase(confirmedOrder);
-                showToast('Online Payment Successful! Your order has been confirmed.', 'success');
-              }
-            })
-            .catch(() => {});
-        } else if (payment === 'failed') {
-          showToast('Online payment could not be completed. Please try again or choose Cash on Delivery.', 'error');
-        } else if (payment === 'cancelled') {
-          showToast('Online payment was cancelled. Your order remains pending.', 'info');
+    fetch('/api/settings')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.bkashNumber) {
+          setSettings(data);
         }
-        window.history.replaceState({}, document.title, window.location.pathname);
-      }
-    } catch {}
+      })
+      .catch(() => {});
   }, []);
 
   // URL and Browser History Synchronization for Deep Links (/products/:id, /wishlist, /admin/login, /admin/dashboard, /shop)
@@ -430,6 +423,27 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     showToast('Promo code removed', 'info');
   };
 
+  // Dynamic Shipping Fee Calculator
+  const calculateShippingFee = useCallback((districtName: string, itemsList?: CartItem[]): number => {
+    const items = itemsList || cart;
+    const lower = (districtName || '').toLowerCase();
+    const isDhaka = lower.includes('dhaka - inside') || (lower.includes('dhaka') && !lower.includes('suburb'));
+    const base = isDhaka ? settings.deliveryChargeInsideDhaka : settings.deliveryChargeOutsideDhaka;
+    const totalWeight = items.reduce((sum, item) => {
+      const w = (item.product?.weightGrams && item.product.weightGrams > 0) ? item.product.weightGrams : 1000;
+      return sum + w * item.quantity;
+    }, 0);
+
+    let extraCharge = 0;
+    if (totalWeight > settings.baseWeightGrams && settings.extraChargePerKg > 0) {
+      const extraGrams = totalWeight - settings.baseWeightGrams;
+      const extraKg = Math.ceil(extraGrams / 1000);
+      extraCharge = extraKg * settings.extraChargePerKg;
+    }
+
+    return base + extraCharge;
+  }, [cart, settings]);
+
   // Financial calculations
   const subtotal = cart.reduce((acc, item) => acc + item.product.price * item.quantity, 0);
   
@@ -442,8 +456,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }
 
-  const freeShippingThreshold = 5000; // Complimentary Delivery in Bangladesh over ৳ 5,000
-  const shippingFee = subtotal >= freeShippingThreshold || cart.length === 0 ? 0 : 80;
+  const freeShippingThreshold = 50000;
+  const shippingFee = cart.length === 0 ? 0 : calculateShippingFee('Dhaka - Inside City', cart);
   const total = Math.max(0, subtotal - discountAmount + shippingFee);
 
   // Currency Formatter - Strictly ৳ BDT formatting
@@ -493,14 +507,27 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Orders
   const placeOrder = async (orderData: Partial<Order>): Promise<Order> => {
+    const districtName = orderData.district || 'Dhaka - Inside City';
+    const actualShipping = calculateShippingFee(districtName, cart);
+    const totalWeight = cart.reduce((sum, item) => sum + ((item.product?.weightGrams || 1000) * item.quantity), 0);
+    const codAmount = Math.max(0, subtotal - discountAmount);
+    const orderTotal = codAmount + actualShipping;
+
     const payload = {
       ...orderData,
       items: cart,
       subtotal,
       discountAmount,
-      shippingFee,
-      total,
-      currency
+      shippingFee: actualShipping,
+      total: orderTotal,
+      totalWeightGrams: totalWeight,
+      codAmountToCollect: codAmount,
+      remainingAmountDue: codAmount,
+      paymentMethod: 'COD',
+      paymentStatus: 'Due',
+      orderStatus: 'Awaiting Delivery Charge',
+      deliveryChargePaid: false,
+      currency: 'BDT'
     };
 
     try {
@@ -510,6 +537,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         body: JSON.stringify(payload)
       });
       const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to place order');
+      }
       const newOrder = data.order;
       
       setActiveOrder(newOrder);
@@ -517,7 +547,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       clearCart();
       setView('order-confirmation');
       trackPurchase(newOrder);
-      showToast('Royal Order Placed Successfully!');
+      showToast('Order Placed! Please send the delivery charge to confirm.', 'success');
       return newOrder;
     } catch (err) {
       // Local fallback
@@ -527,20 +557,26 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         customerName: orderData.customerName || 'Valued Guest',
         customerPhone: orderData.customerPhone || '',
         customerEmail: orderData.customerEmail,
-        district: orderData.district || orderData.city || 'Dhaka',
+        district: districtName,
         address: orderData.address || '',
         area: orderData.area || '',
-        city: orderData.city || '',
+        city: orderData.city || districtName,
         notes: orderData.notes,
-        paymentMethod: orderData.paymentMethod || 'COD',
-        paymentStatus: orderData.paymentMethod === 'COD' ? 'Due' : (orderData.paymentStatus || 'Pending'),
-        orderStatus: 'Pending',
+        paymentMethod: 'COD',
+        paymentStatus: 'Due',
+        orderStatus: 'Awaiting Delivery Charge',
+        deliveryChargePaid: false,
         items: cart,
         subtotal,
         discountAmount,
-        shippingFee,
-        total,
-        currency,
+        shippingFee: actualShipping,
+        total: orderTotal,
+        totalWeightGrams: totalWeight,
+        codAmountToCollect: codAmount,
+        remainingAmountDue: codAmount,
+        courierName: (orderData.courierName as any) || 'Steadfast',
+        courierPartner: (orderData.courierName as any) || 'Steadfast',
+        currency: 'BDT',
         createdAt: new Date().toISOString(),
         trackingNumber: `TRK-KNG-${Math.floor(100000 + Math.random() * 900000)}`
       };
@@ -550,7 +586,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       clearCart();
       setView('order-confirmation');
       trackPurchase(fallbackOrder);
-      showToast('Royal Order Placed Successfully!');
+      showToast('Order Placed! Please send the delivery charge to confirm.', 'success');
       return fallbackOrder;
     }
   };
@@ -563,9 +599,78 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         body: JSON.stringify({ status })
       });
       setAllOrders(prev => prev.map(o => o.id === orderId ? { ...o, orderStatus: status } : o));
+      if (activeOrder?.id === orderId) {
+        setActiveOrder(prev => prev ? { ...prev, orderStatus: status } : null);
+      }
       showToast(`Order ${orderId} status updated to ${status}`);
     } catch {
       setAllOrders(prev => prev.map(o => o.id === orderId ? { ...o, orderStatus: status } : o));
+      showToast(`Order ${orderId} status updated to ${status}`);
+    }
+  };
+
+  const markDeliveryChargeReceived = async (orderId: string): Promise<boolean> => {
+    try {
+      const res = await fetch(`/api/orders/${orderId}/delivery-charge-paid`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setAllOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updated, deliveryChargePaid: true, orderStatus: updated.orderStatus || 'Confirmed' } : o));
+        if (activeOrder?.id === orderId) {
+          setActiveOrder(prev => prev ? { ...prev, ...updated, deliveryChargePaid: true, orderStatus: updated.orderStatus || 'Confirmed' } : null);
+        }
+        showToast(`Delivery charge received for Order #${orderId}`, 'success');
+        return true;
+      }
+      return false;
+    } catch {
+      setAllOrders(prev => prev.map(o => o.id === orderId ? { ...o, deliveryChargePaid: true, orderStatus: 'Confirmed' } : o));
+      showToast(`Delivery charge received for Order #${orderId}`, 'success');
+      return true;
+    }
+  };
+
+  const updateCourierBooking = async (orderId: string, courierName: 'Steadfast' | 'Pathao', consignmentId: string, codAmount?: number): Promise<boolean> => {
+    try {
+      const res = await fetch(`/api/orders/${orderId}/courier`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ courierName, consignmentId, codAmountToCollect: codAmount })
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setAllOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updated } : o));
+        showToast(`Courier booked via ${courierName}: #${consignmentId}`, 'success');
+        return true;
+      }
+      return false;
+    } catch {
+      setAllOrders(prev => prev.map(o => o.id === orderId ? { ...o, courierName, courierPartner: courierName, consignmentId, codAmountToCollect: codAmount } : o));
+      showToast(`Courier details updated for #${orderId}`, 'success');
+      return true;
+    }
+  };
+
+  const updateSettings = async (newSettings: Partial<StoreSettings>): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newSettings)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.settings) setSettings(data.settings);
+        showToast('Store settings saved successfully', 'success');
+        return true;
+      }
+      return false;
+    } catch {
+      setSettings(prev => ({ ...prev, ...newSettings }));
+      showToast('Store settings saved', 'success');
+      return true;
     }
   };
 
@@ -628,6 +733,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         appliedCoupon,
         applyCoupon,
         removeCoupon,
+        settings,
+        updateSettings,
+        calculateShippingFee,
         subtotal,
         discountAmount,
         shippingFee,
@@ -653,6 +761,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setAllOrders,
         placeOrder,
         updateOrderStatus,
+        markDeliveryChargeReceived,
+        updateCourierBooking,
         toasts,
         showToast,
         isSearchOpen,

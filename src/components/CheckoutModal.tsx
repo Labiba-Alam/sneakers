@@ -1,105 +1,121 @@
 import React, { useState } from 'react';
 import { useStore } from '../context/StoreContext';
-import { PaymentMethod } from '../types';
 import { BANGLADESH_DISTRICTS } from '../data/districts';
-import { ShieldCheck, Lock, CreditCard, ArrowLeft, Crown, Truck, AlertCircle, MapPin, Banknote, Sparkles, CheckCircle2, Info } from 'lucide-react';
+import { 
+  ShieldCheck, 
+  Lock, 
+  ArrowLeft, 
+  Crown, 
+  Truck, 
+  AlertCircle, 
+  MapPin, 
+  Banknote, 
+  CheckCircle2, 
+  Copy, 
+  PhoneCall, 
+  MessageCircle,
+  HelpCircle,
+  Check,
+  Scale
+} from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { optimizeImageUrl } from '../lib/imageUtils';
 
 export const CheckoutModal: React.FC = () => {
-  const { cart, subtotal, discountAmount, formatPrice, placeOrder, setView, currency, showToast } = useStore();
+  const { 
+    cart, 
+    subtotal, 
+    discountAmount, 
+    formatPrice, 
+    placeOrder, 
+    setView, 
+    showToast,
+    settings,
+    calculateShippingFee
+  } = useStore();
 
-  // Guest Checkout Form State
+  // Guest Checkout Form State (Guest checkout only)
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [phoneError, setPhoneError] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [selectedDistrictName, setSelectedDistrictName] = useState('Dhaka - Inside City');
-  const [city, setCity] = useState('Dhaka');
-  const [area, setArea] = useState('');
   const [address, setAddress] = useState('');
   const [notes, setNotes] = useState('');
   
-  // Payment Mode
-  // 'COD' = Cash on Delivery with advance delivery fee
-  // 'SSLCommerz/Card' = 100% full online prepayment
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('COD');
-  
-  // Advance Delivery Fee Verification for COD
-  const [advanceMethod, setAdvanceMethod] = useState<'bKash' | 'Nagad' | 'Rocket'>('bKash');
+  // Optional MFS payment details (order CAN be placed without them)
+  const [mfsMethod, setMfsMethod] = useState<'bKash' | 'Nagad' | 'Rocket'>('bKash');
   const [senderMfsPhone, setSenderMfsPhone] = useState('');
   const [trxId, setTrxId] = useState('');
-  const [selectedCourier, setSelectedCourier] = useState<'Steadfast' | 'Pathao'>('Steadfast');
   
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
 
-  // Selected District & Delivery Fee Calculation (BDT)
-  // Confirmed: Inside Dhaka = ৳ 100, Outside Dhaka = ৳ 160
+  // Selected District & Delivery Fee Calculation
   const selectedDistrict = BANGLADESH_DISTRICTS.find(d => d.name === selectedDistrictName) || BANGLADESH_DISTRICTS[0];
   const isInsideDhaka = selectedDistrict.isDhaka;
-  const deliveryCharge = isInsideDhaka ? 100 : 160;
   
-  // Confirmed rule: Delivery charges must be paid in advance for both areas.
-  const actualDeliveryCharge = deliveryCharge;
-  const grandTotal = Math.max(0, subtotal - discountAmount + actualDeliveryCharge);
-  const remainingDueOnDelivery = paymentMethod === 'COD' ? Math.max(0, subtotal - discountAmount) : 0;
-  const payableNow = paymentMethod === 'COD' ? actualDeliveryCharge : grandTotal;
+  // Total parcel weight: sum(weightGrams * quantity)
+  const totalWeightGrams = cart.reduce((sum, item) => {
+    const w = (item.product?.weightGrams && item.product.weightGrams > 0) ? item.product.weightGrams : 1000;
+    return sum + w * item.quantity;
+  }, 0);
 
-  // Bangladeshi Mobile Number Validation (01XXXXXXXXX or +8801XXXXXXXXX)
+  // Dynamic delivery charge calculation
+  const deliveryCharge = calculateShippingFee(selectedDistrict.name, cart);
+  const codAmountToCollect = Math.max(0, subtotal - discountAmount);
+  const grandTotal = codAmountToCollect + deliveryCharge;
+
+  // Bangladeshi Mobile Number Validation (013-019XXXXXXXX or +8801XXXXXXXXX)
   const validateBDPhone = (phone: string) => {
     const cleaned = phone.replace(/[\s-]/g, '');
     const bdRegex = /^(?:\+?88)?01[3-9]\d{8}$/;
     return bdRegex.test(cleaned);
   };
 
+  const copyToClipboard = (text: string, key: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedKey(key);
+    showToast(`Copied ${key} number: ${text}`, 'success');
+    setTimeout(() => setCopiedKey(null), 2500);
+  };
+
   const triggerConfetti = () => {
     try {
       confetti({
-        particleCount: 100,
-        spread: 70,
+        particleCount: 80,
+        spread: 60,
         origin: { y: 0.6 }
       });
     } catch {}
   };
 
-  const handleDistrictChange = (districtName: string) => {
-    setSelectedDistrictName(districtName);
-    const dist = BANGLADESH_DISTRICTS.find(d => d.name === districtName);
-    if (dist) {
-      setCity(dist.division || dist.name);
-    }
+  const handleDistrictChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedDistrictName(e.target.value);
   };
+
+  const cleanWhatsAppNumber = (settings.whatsappNumber || '01581054939').replace(/^(\+?88)?0?/, '880');
 
   const handleSubmitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     setPhoneError('');
     setSubmitError('');
 
-    // Field Validations
-    if (!customerName.trim()) {
-      showToast('Please enter your full name.', 'error');
+    // Required fields: Name, Phone, Full address, District
+    if (!customerName.trim() || customerName.trim().length < 2) {
+      showToast('Please enter your full recipient name.', 'error');
       return;
     }
 
     if (!validateBDPhone(customerPhone)) {
-      setPhoneError('Please enter a valid 11-digit Bangladeshi number (e.g. 017XXXXXXXX).');
+      setPhoneError('Please enter a valid 11-digit Bangladeshi mobile number (e.g. 017XXXXXXXX).');
       showToast('Invalid Bangladeshi phone number.', 'error');
       return;
     }
 
-    if (!city.trim()) {
-      showToast('Please enter your City / Division.', 'error');
-      return;
-    }
-
-    if (!area.trim()) {
-      showToast('Please enter your Area / Thana / Upazila.', 'error');
-      return;
-    }
-
-    if (!address.trim()) {
-      showToast('Please enter your complete delivery street address.', 'error');
+    if (!address.trim() || address.trim().length < 5) {
+      showToast('Please enter your complete delivery street address (at least 5 characters).', 'error');
       return;
     }
 
@@ -108,22 +124,14 @@ export const CheckoutModal: React.FC = () => {
       return;
     }
 
-    // If COD, validate TrxID for advance delivery fee
-    if (paymentMethod === 'COD') {
-      if (!trxId.trim()) {
-        showToast('Please enter the Transaction ID (TrxID) for the advance delivery fee.', 'error');
-        return;
-      }
-      if (senderMfsPhone.trim() && !validateBDPhone(senderMfsPhone)) {
-        showToast('Please enter a valid 11-digit sender phone number.', 'error');
-        return;
-      }
+    if (senderMfsPhone.trim() && !validateBDPhone(senderMfsPhone)) {
+      showToast('Please check your sender number: must be an 11-digit mobile number.', 'error');
+      return;
     }
 
     setIsSubmitting(true);
 
     try {
-      // Generate client-side idempotency key
       const idempotencyKey = typeof crypto !== 'undefined' && crypto.randomUUID 
         ? crypto.randomUUID() 
         : `idemp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
@@ -134,126 +142,200 @@ export const CheckoutModal: React.FC = () => {
         customerPhone: customerPhone.trim(),
         customerEmail: customerEmail.trim() || undefined,
         district: selectedDistrict.name,
-        city: city.trim() || selectedDistrict.division,
-        area: area.trim(),
+        city: selectedDistrict.division || selectedDistrict.name,
+        area: selectedDistrict.name,
         address: address.trim(),
         notes: notes.trim() || undefined,
-        paymentMethod,
-        items: cart,
+        paymentMethod: 'COD' as const,
+        paymentStatus: 'Due' as const,
+        orderStatus: 'Awaiting Delivery Charge' as const,
+        deliveryChargePaid: false,
+        mfsMethod: mfsMethod,
+        senderMfsPhone: senderMfsPhone.trim() || undefined,
+        advanceDeliveryFeeTrxId: trxId.trim() || undefined,
         subtotal,
         discountAmount,
-        shippingFee: actualDeliveryCharge,
+        shippingFee: deliveryCharge,
         total: grandTotal,
-        currency: 'BDT' as const,
-        advanceDeliveryFeePaid: paymentMethod === 'COD' ? true : false,
-        advanceDeliveryFeeTrxId: paymentMethod === 'COD' ? trxId.trim() : undefined,
-        advanceDeliveryFeeMethod: paymentMethod === 'COD' ? advanceMethod : 'Online Gateway',
-        remainingAmountDue: remainingDueOnDelivery,
-        courierPartner: selectedCourier,
+        codAmountToCollect,
+        remainingAmountDue: codAmountToCollect,
+        totalWeightGrams,
+        courierName: 'Steadfast' as const,
+        courierPartner: 'Steadfast' as const,
       };
 
-      if (paymentMethod === 'SSLCommerz/Card') {
-        // Online Payment via SSLCommerz Gateway
-        showToast('Connecting to SSLCommerz secure gateway...', 'info');
-
-        const res = await fetch('/api/payment/sslcommerz/init', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(orderPayload),
-        });
-
-        const data = await res.json();
-
-        if (data.success && data.gatewayUrl) {
-          window.location.href = data.gatewayUrl;
-          return;
-        } else {
-          throw new Error(data.error || 'Could not connect to payment gateway.');
-        }
-      } else {
-        // Cash on Delivery with Verified Advance Delivery Fee
-        await placeOrder({
-          ...orderPayload,
-          paymentMethod: 'COD',
-          paymentStatus: 'Delivery Fee Paid',
-          orderStatus: 'Confirmed',
-          paymentDetails: {
-            transactionId: trxId.trim(),
-            mfsPhone: senderMfsPhone.trim() || customerPhone.trim(),
-          },
-        });
-
-        triggerConfetti();
-        showToast(`Order confirmed! Advance delivery fee (৳${actualDeliveryCharge}) logged.`, 'success');
-      }
+      await placeOrder(orderPayload);
+      triggerConfetti();
     } catch (err: any) {
-      console.error('Order submission error:', err);
-      setSubmitError(err.message || 'An error occurred while submitting your order. Please try again.');
-      showToast(err.message || 'Failed to place order. Please try again.', 'error');
+      setSubmitError(err?.message || 'Failed to place order. Please check your information and try again.');
+      showToast('Failed to place order. Please try again.', 'error');
+    } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <section className="py-12 bg-[#111111] min-h-screen text-[#F8F8F8]">
+    <section className="py-8 sm:py-12 bg-[#0e0e0e] min-h-screen text-[#F8F8F8]">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         
-        {/* Navigation Breadcrumb */}
-        <div className="flex items-center justify-between pb-8 mb-8 border-b border-white/10">
+        {/* Navigation & Header */}
+        <div className="flex items-center justify-between mb-8 pb-4 border-b border-white/10">
           <button
-            onClick={() => setView('cart')}
-            className="flex items-center gap-2 text-xs uppercase tracking-widest text-white/60 hover:text-white transition-colors"
+            onClick={() => setView('catalog')}
+            className="flex items-center gap-2 text-xs uppercase tracking-wider text-white/70 hover:text-white transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Return to Shopping Bag</span>
+            <span>Continue Shopping</span>
           </button>
-          
-          <div className="flex items-center gap-2 text-xs text-[#C7A55B]">
-            <Crown className="w-4 h-4" />
-            <span className="font-serif-luxury font-bold tracking-wider">KINGSMAN DIRECT SECURE CHECKOUT</span>
+          <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-[#C7A55B] font-bold">
+            <Lock className="w-3.5 h-3.5" />
+            <span>Guest Checkout • Cash on Delivery</span>
           </div>
         </div>
 
-        {submitError && (
-          <div className="mb-8 p-4 bg-[#C1121F]/10 border border-[#C1121F] text-[#C1121F] text-xs flex items-center gap-3">
-            <AlertCircle className="w-5 h-5 shrink-0" />
-            <span>{submitError}</span>
-          </div>
-        )}
-
-        <div className="flex flex-col lg:flex-row gap-12">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
-          {/* Main Checkout Form Column */}
-          <div className="lg:w-7/12 space-y-8">
-            <form onSubmit={handleSubmitOrder} className="space-y-8">
-              
-              {/* Section 1: Customer Contact & Dispatch Address */}
-              <div className="bg-[#161616] border border-white/10 p-6 space-y-5 shadow-xl">
-                <h3 className="font-serif-luxury text-lg font-bold text-white pb-3 border-b border-white/10 flex justify-between items-center">
-                  <span>1. Contact & Dispatch Address</span>
-                  <span className="text-[10px] text-white/40 font-mono">Step 1 of 2</span>
-                </h3>
+          {/* Main Checkout Form (7 cols) */}
+          <div className="lg:col-span-7 space-y-6">
+            
+            {/* Owner Payment Policy Callout Box */}
+            <div className="bg-[#181818] border-2 border-[#C7A55B]/60 p-5 sm:p-6 rounded-lg shadow-xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 bg-[#C7A55B] text-black text-[10px] uppercase font-bold tracking-widest px-3 py-1">
+                Advance Required
+              </div>
 
-                {/* Name */}
+              <div className="flex items-start gap-3 mb-3">
+                <AlertCircle className="w-5 h-5 text-[#C7A55B] shrink-0 mt-0.5" />
                 <div>
-                  <label className="text-xs uppercase tracking-wider text-white/70 block mb-1 font-semibold">
-                    Full Name <span className="text-[#C1121F]">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Asif Ahmed"
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    className="w-full px-4 py-3 bg-[#111111] border border-white/20 text-white text-xs focus:outline-none focus:border-[#C1121F] placeholder:text-white/30"
-                  />
+                  <h3 className="font-serif-luxury text-base sm:text-lg font-bold text-white tracking-wide">
+                    Delivery Charge Payment Instructions
+                  </h3>
+                  <p className="text-xs text-white/80 mt-1 leading-relaxed">
+                    Please send the delivery charge in advance to bKash / Nagad / Rocket:{' '}
+                    <span className="font-mono font-bold text-[#C7A55B] text-sm bg-black/40 px-1.5 py-0.5 rounded">
+                      {settings.bkashNumber || '01581054939'}
+                    </span>
+                    . Your order is confirmed after the delivery charge is received. For quick confirmation call or WhatsApp{' '}
+                    <span className="font-mono font-bold text-[#C7A55B] text-sm bg-black/40 px-1.5 py-0.5 rounded">
+                      {settings.whatsappNumber || '01581054939'}
+                    </span>
+                    .
+                  </p>
+                </div>
+              </div>
+
+              {/* MFS Quick Copy Numbers & WhatsApp Button */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-3 border-t border-white/10 mt-3">
+                
+                {/* bKash Copy */}
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(settings.bkashNumber || '01581054939', 'bKash')}
+                  className="flex items-center justify-between px-3 py-2 bg-[#222222] hover:bg-[#2a2a2a] border border-white/10 hover:border-[#E2136E]/60 rounded text-left transition-all group"
+                >
+                  <div>
+                    <span className="text-[10px] uppercase tracking-wider text-[#E2136E] font-bold block">bKash (Send-Money)</span>
+                    <span className="font-mono text-xs text-white group-hover:text-white">{settings.bkashNumber || '01581054939'}</span>
+                  </div>
+                  {copiedKey === 'bKash' ? (
+                    <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5 text-white/50 group-hover:text-white shrink-0" />
+                  )}
+                </button>
+
+                {/* Nagad Copy */}
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(settings.nagadNumber || '01581054939', 'Nagad')}
+                  className="flex items-center justify-between px-3 py-2 bg-[#222222] hover:bg-[#2a2a2a] border border-white/10 hover:border-[#F7921E]/60 rounded text-left transition-all group"
+                >
+                  <div>
+                    <span className="text-[10px] uppercase tracking-wider text-[#F7921E] font-bold block">Nagad (Send-Money)</span>
+                    <span className="font-mono text-xs text-white group-hover:text-white">{settings.nagadNumber || '01581054939'}</span>
+                  </div>
+                  {copiedKey === 'Nagad' ? (
+                    <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5 text-white/50 group-hover:text-white shrink-0" />
+                  )}
+                </button>
+
+                {/* Rocket Copy */}
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(settings.rocketNumber || '01581054939', 'Rocket')}
+                  className="flex items-center justify-between px-3 py-2 bg-[#222222] hover:bg-[#2a2a2a] border border-white/10 hover:border-[#8C3494]/60 rounded text-left transition-all group"
+                >
+                  <div>
+                    <span className="text-[10px] uppercase tracking-wider text-[#B845C2] font-bold block">Rocket (Send-Money)</span>
+                    <span className="font-mono text-xs text-white group-hover:text-white">{settings.rocketNumber || '01581054939'}</span>
+                  </div>
+                  {copiedKey === 'Rocket' ? (
+                    <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5 text-white/50 group-hover:text-white shrink-0" />
+                  )}
+                </button>
+
+              </div>
+
+              {/* Direct WhatsApp Confirmation Button */}
+              <div className="mt-3 pt-3 border-t border-white/10 flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[11px] text-white/60">
+                  Product price is paid in cash when parcel is delivered (COD).
+                </span>
+                <a
+                  href={`https://wa.me/${cleanWhatsAppNumber}?text=${encodeURIComponent('Hi KINGSMAN, I want to confirm my delivery charge payment.')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#25D366] hover:bg-[#20ba59] text-black text-xs font-bold uppercase tracking-wider rounded transition-colors shadow"
+                >
+                  <MessageCircle className="w-3.5 h-3.5 fill-black" />
+                  <span>WhatsApp Concierge</span>
+                </a>
+              </div>
+            </div>
+
+            {/* Guest Checkout Information Form */}
+            <form onSubmit={handleSubmitOrder} className="space-y-6">
+              
+              <div className="bg-[#141414] border border-white/10 p-6 rounded-lg space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                  <h2 className="font-serif-luxury text-base font-bold text-white tracking-wide flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-[#C7A55B]" />
+                    <span>Recipient Delivery Information</span>
+                  </h2>
+                  <span className="text-[10px] uppercase tracking-wider text-white/50">No account required</span>
                 </div>
 
-                {/* Phone & Email Grid */}
+                {submitError && (
+                  <div className="p-3 bg-red-950/60 border border-red-500/50 text-red-200 text-xs rounded">
+                    {submitError}
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  
+                  {/* Full Name (Required) */}
                   <div>
-                    <label className="text-xs uppercase tracking-wider text-white/70 block mb-1 font-semibold">
-                      Mobile Number (Bangladesh) <span className="text-[#C1121F]">*</span>
+                    <label className="text-[10px] uppercase font-bold text-white/80 block mb-1">
+                      Full Name <span className="text-[#C1121F]">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Asif Mahmud"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-[#1a1a1a] border border-white/15 focus:border-[#C7A55B] text-white text-xs rounded outline-none transition-colors"
+                    />
+                  </div>
+
+                  {/* Phone Number (Required) */}
+                  <div>
+                    <label className="text-[10px] uppercase font-bold text-white/80 block mb-1">
+                      Phone Number <span className="text-[#C1121F]">*</span>
                     </label>
                     <input
                       type="tel"
@@ -262,461 +344,324 @@ export const CheckoutModal: React.FC = () => {
                       value={customerPhone}
                       onChange={(e) => {
                         setCustomerPhone(e.target.value);
-                        if (phoneError) setPhoneError('');
+                        setPhoneError('');
                       }}
-                      className={`w-full px-4 py-3 bg-[#111111] border text-white text-xs focus:outline-none placeholder:text-white/30 ${
-                        phoneError ? 'border-[#C1121F]' : 'border-white/20 focus:border-[#C1121F]'
-                      }`}
+                      className={`w-full px-3 py-2.5 bg-[#1a1a1a] border ${phoneError ? 'border-red-500' : 'border-white/15'} focus:border-[#C7A55B] text-white text-xs font-mono rounded outline-none transition-colors`}
                     />
-                    {phoneError && (
-                      <p className="text-[10px] text-[#C1121F] mt-1">{phoneError}</p>
-                    )}
+                    {phoneError && <p className="text-[10px] text-red-400 mt-1">{phoneError}</p>}
                   </div>
 
+                  {/* District Dropdown (Required) */}
+                  <div className="sm:col-span-2">
+                    <label className="text-[10px] uppercase font-bold text-white/80 block mb-1">
+                      District & Delivery Zone <span className="text-[#C1121F]">*</span>
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={selectedDistrictName}
+                        onChange={handleDistrictChange}
+                        className="w-full px-3 py-2.5 bg-[#1a1a1a] border border-white/15 focus:border-[#C7A55B] text-white text-xs rounded outline-none transition-colors appearance-none cursor-pointer"
+                      >
+                        <optgroup label="Inside Dhaka (Delivery Charge: ৳ 100)">
+                          {BANGLADESH_DISTRICTS.filter(d => d.isDhaka).map(d => (
+                            <option key={d.name} value={d.name}>
+                              {d.name} (Inside Dhaka — ৳ 100)
+                            </option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="Outside Dhaka (Delivery Charge: ৳ 160)">
+                          {BANGLADESH_DISTRICTS.filter(d => !d.isDhaka).map(d => (
+                            <option key={d.name} value={d.name}>
+                              {d.name} (Outside Dhaka — ৳ 160)
+                            </option>
+                          ))}
+                        </optgroup>
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-white/50">
+                        <Truck className="w-3.5 h-3.5 text-[#C7A55B]" />
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-white/50 mt-1">
+                      {isInsideDhaka 
+                        ? 'Inside Dhaka delivery rate: ৳ 100 (1-3 working days)' 
+                        : 'Outside Dhaka / District rate: ৳ 160 (2-5 working days via Steadfast / Pathao)'}
+                    </p>
+                  </div>
+
+                  {/* Full Address (Required) */}
+                  <div className="sm:col-span-2">
+                    <label className="text-[10px] uppercase font-bold text-white/80 block mb-1">
+                      Full Delivery Address <span className="text-[#C1121F]">*</span>
+                    </label>
+                    <textarea
+                      required
+                      rows={2}
+                      placeholder="House / Flat #, Road #, Area / Thana, Landmark"
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      className="w-full px-3 py-2 bg-[#1a1a1a] border border-white/15 focus:border-[#C7A55B] text-white text-xs rounded outline-none transition-colors"
+                    />
+                  </div>
+
+                  {/* Email (Optional) */}
                   <div>
-                    <label className="text-xs uppercase tracking-wider text-white/70 block mb-1 font-semibold">
-                      Email Address <span className="text-white/40 text-[10px] lowercase">(optional)</span>
+                    <label className="text-[10px] uppercase font-bold text-white/60 block mb-1">
+                      Email Address <span className="text-white/40">(Optional)</span>
                     </label>
                     <input
                       type="email"
-                      placeholder="your.email@example.com"
+                      placeholder="e.g. asif@example.com"
                       value={customerEmail}
                       onChange={(e) => setCustomerEmail(e.target.value)}
-                      className="w-full px-4 py-3 bg-[#111111] border border-white/20 text-white text-xs focus:outline-none focus:border-[#C1121F] placeholder:text-white/30"
+                      className="w-full px-3 py-2.5 bg-[#1a1a1a] border border-white/15 focus:border-[#C7A55B] text-white text-xs rounded outline-none transition-colors"
                     />
                   </div>
-                </div>
 
-                {/* District Selection */}
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="text-xs uppercase tracking-wider text-white/70 font-semibold">
-                      District / Division <span className="text-[#C1121F]">*</span>
-                    </label>
-                    <span className="text-[11px] font-mono text-[#C7A55B]">
-                      {isInsideDhaka ? '৳100 (1-3 Days)' : '৳160 (2-5 Days)'}
-                    </span>
-                  </div>
-                  <select
-                    value={selectedDistrictName}
-                    onChange={(e) => handleDistrictChange(e.target.value)}
-                    className="w-full px-4 py-3 bg-[#111111] border border-white/20 text-white text-xs focus:outline-none focus:border-[#C1121F]"
-                  >
-                    {BANGLADESH_DISTRICTS.map((d) => (
-                      <option key={d.name} value={d.name}>
-                        {d.name} ({d.isDhaka ? 'Inside Dhaka — ৳100' : 'Outside Dhaka — ৳160'})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* City & Area Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Order Note (Optional) */}
                   <div>
-                    <label className="text-xs uppercase tracking-wider text-white/70 block mb-1 font-semibold">
-                      City / Thana <span className="text-[#C1121F]">*</span>
+                    <label className="text-[10px] uppercase font-bold text-white/60 block mb-1">
+                      Order Note <span className="text-white/40">(Optional)</span>
                     </label>
                     <input
                       type="text"
-                      required
-                      placeholder="e.g. Dhaka / Chattogram"
-                      value={city}
-                      onChange={(e) => setCity(e.target.value)}
-                      className="w-full px-4 py-3 bg-[#111111] border border-white/20 text-white text-xs focus:outline-none focus:border-[#C1121F] placeholder:text-white/30"
+                      placeholder="e.g. Leave with security, call before arrival"
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-[#1a1a1a] border border-white/15 focus:border-[#C7A55B] text-white text-xs rounded outline-none transition-colors"
                     />
                   </div>
 
-                  <div>
-                    <label className="text-xs uppercase tracking-wider text-white/70 block mb-1 font-semibold">
-                      Area / Road / Sector <span className="text-[#C1121F]">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Mirpur-10 / Banani / Dhanmondi"
-                      value={area}
-                      onChange={(e) => setArea(e.target.value)}
-                      className="w-full px-4 py-3 bg-[#111111] border border-white/20 text-white text-xs focus:outline-none focus:border-[#C1121F] placeholder:text-white/30"
-                    />
-                  </div>
-                </div>
-
-                {/* Full Street Address */}
-                <div>
-                  <label className="text-xs uppercase tracking-wider text-white/70 block mb-1 font-semibold">
-                    Complete Street Address <span className="text-[#C1121F]">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="House No, Road No, Flat/Apartment, Landmark..."
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    className="w-full px-4 py-3 bg-[#111111] border border-white/20 text-white text-xs focus:outline-none focus:border-[#C1121F] placeholder:text-white/30"
-                  />
-                </div>
-
-                {/* Preferred Courier Partner */}
-                <div>
-                  <label className="text-xs uppercase tracking-wider text-white/70 block mb-2 font-semibold">
-                    Fulfillment Courier Partner
-                  </label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedCourier('Steadfast')}
-                      className={`p-3 border text-left flex items-center justify-between transition-all ${
-                        selectedCourier === 'Steadfast'
-                          ? 'border-[#C7A55B] bg-[#C7A55B]/10 text-white'
-                          : 'border-white/10 bg-[#111111] text-white/60 hover:text-white'
-                      }`}
-                    >
-                      <div>
-                        <p className="text-xs font-bold">Steadfast Courier</p>
-                        <p className="text-[10px] text-white/50">Nationwide doorstep tracking</p>
-                      </div>
-                      {selectedCourier === 'Steadfast' && <CheckCircle2 className="w-4 h-4 text-[#C7A55B]" />}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setSelectedCourier('Pathao')}
-                      className={`p-3 border text-left flex items-center justify-between transition-all ${
-                        selectedCourier === 'Pathao'
-                          ? 'border-[#C7A55B] bg-[#C7A55B]/10 text-white'
-                          : 'border-white/10 bg-[#111111] text-white/60 hover:text-white'
-                      }`}
-                    >
-                      <div>
-                        <p className="text-xs font-bold">Pathao Express</p>
-                        <p className="text-[10px] text-white/50">Fast city & hub delivery</p>
-                      </div>
-                      {selectedCourier === 'Pathao' && <CheckCircle2 className="w-4 h-4 text-[#C7A55B]" />}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Delivery Notes */}
-                <div>
-                  <label className="text-xs uppercase tracking-wider text-white/70 block mb-1 font-semibold">
-                    Delivery Instructions <span className="text-white/40 text-[10px] lowercase">(optional)</span>
-                  </label>
-                  <textarea
-                    rows={2}
-                    placeholder="Gate code, call before delivery, preferred delivery window..."
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    className="w-full px-4 py-2 bg-[#111111] border border-white/20 text-white text-xs focus:outline-none focus:border-[#C1121F] placeholder:text-white/30"
-                  />
                 </div>
               </div>
 
-              {/* Section 2: Payment Method & Advance Delivery Fee */}
-              <div className="bg-[#161616] border border-white/10 p-6 space-y-5 shadow-xl">
-                <div className="pb-3 border-b border-white/10 flex justify-between items-center">
-                  <h3 className="font-serif-luxury text-lg font-bold text-white">
-                    2. Payment & Advance Delivery Fee
-                  </h3>
-                  <span className="text-[10px] text-[#C7A55B] font-mono">Verified Policy</span>
+              {/* Optional Advance Delivery Charge Input Details */}
+              <div className="bg-[#141414] border border-white/10 p-6 rounded-lg space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                  <h2 className="font-serif-luxury text-base font-bold text-white tracking-wide flex items-center gap-2">
+                    <Banknote className="w-4 h-4 text-[#C7A55B]" />
+                    <span>Advance Delivery Charge Details</span>
+                  </h2>
+                  <span className="text-[10px] uppercase tracking-wider text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 px-2 py-0.5 rounded">
+                    Optional at checkout
+                  </span>
                 </div>
 
-                {/* Confirmed Policy Callout */}
-                <div className="p-3.5 bg-[#C7A55B]/10 border border-[#C7A55B]/30 flex items-start gap-3">
-                  <Info className="w-4 h-4 text-[#C7A55B] shrink-0 mt-0.5" />
-                  <div className="text-xs text-white/80 space-y-1">
-                    <p className="font-bold text-[#C7A55B]">Advance Delivery Fee Requirement</p>
-                    <p className="text-[11px] leading-relaxed">
-                      Delivery charges (<strong>৳{actualDeliveryCharge}</strong> for {isInsideDhaka ? 'Inside Dhaka' : 'Outside Dhaka'}) must be paid in advance to confirm order booking. The remaining product amount of <strong>{formatPrice(remainingDueOnDelivery)}</strong> is payable in cash upon receiving your parcel.
-                    </p>
-                  </div>
+                <div className="p-3 bg-white/5 border border-white/10 rounded text-xs text-white/70 space-y-1">
+                  <p>
+                    <strong className="text-white">Have you already sent the delivery charge of {formatPrice(deliveryCharge)}?</strong>
+                  </p>
+                  <p className="text-[11px] text-white/60">
+                    You may provide your transaction details below now, or submit the order without them. If submitted without them, our concierge will verify and call or WhatsApp you before dispatch.
+                  </p>
                 </div>
 
-                <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   
-                  {/* Option 1: Cash on Delivery with Advance Delivery Fee */}
-                  <div
-                    onClick={() => setPaymentMethod('COD')}
-                    className={`p-4 border cursor-pointer transition-all ${
-                      paymentMethod === 'COD'
-                        ? 'bg-white/5 border-emerald-500 ring-1 ring-emerald-500/50'
-                        : 'bg-[#111111] border-white/10 hover:border-white/30'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-3">
-                        <input
-                          type="radio"
-                          name="paymentMethod"
-                          checked={paymentMethod === 'COD'}
-                          onChange={() => setPaymentMethod('COD')}
-                          className="accent-emerald-500 mt-1"
-                        />
-                        <div>
-                          <p className="text-xs font-bold text-white flex items-center gap-2">
-                            <span>Cash on Delivery (Advance Fee via MFS)</span>
-                            <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-[10px] uppercase font-bold rounded">
-                              Most Popular
-                            </span>
-                          </p>
-                          <p className="text-[11px] text-white/60 mt-1">
-                            Pay only <strong>৳{actualDeliveryCharge}</strong> delivery fee now via bKash/Nagad/Rocket. Pay the remaining <strong>{formatPrice(remainingDueOnDelivery)}</strong> cash to the courier.
-                          </p>
-                        </div>
-                      </div>
-                      <Banknote className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-                    </div>
-
-                    {/* Expandable MFS verification details when COD is active */}
-                    {paymentMethod === 'COD' && (
-                      <div className="mt-4 pt-4 border-t border-white/10 space-y-4" onClick={(e) => e.stopPropagation()}>
-                        <div className="p-3 bg-[#111111] border border-white/15 space-y-2 text-xs">
-                          <p className="text-[11px] font-bold text-[#C7A55B] uppercase tracking-wider">
-                            Step 1: Send Money ৳{actualDeliveryCharge} to Official KINGSMAN Account
-                          </p>
-                          <div className="flex items-center justify-between font-mono bg-black/40 px-3 py-2 border border-white/10">
-                            <span className="text-white/70">Official WhatsApp / MFS Number:</span>
-                            <span className="text-white font-bold text-sm tracking-widest text-[#C7A55B]">01581054939</span>
-                          </div>
-                          <p className="text-[10px] text-white/50">
-                            Send Money via bKash, Nagad, or Rocket using Send Money option. Use your name or phone number as reference.
-                          </p>
-                        </div>
-
-                        <div className="space-y-3">
-                          <p className="text-[11px] font-bold text-white/90 uppercase tracking-wider">
-                            Step 2: Enter Advance Payment Details
-                          </p>
-                          
-                          {/* MFS Selector */}
-                          <div className="grid grid-cols-3 gap-2">
-                            {(['bKash', 'Nagad', 'Rocket'] as const).map(provider => (
-                              <button
-                                key={provider}
-                                type="button"
-                                onClick={() => setAdvanceMethod(provider)}
-                                className={`py-2 px-3 border text-xs font-bold uppercase transition-all ${
-                                  advanceMethod === provider
-                                    ? provider === 'bKash'
-                                      ? 'border-[#E2136E] bg-[#E2136E]/20 text-[#E2136E]'
-                                      : provider === 'Nagad'
-                                      ? 'border-[#F7921E] bg-[#F7921E]/20 text-[#F7921E]'
-                                      : 'border-[#8C3494] bg-[#8C3494]/20 text-[#8C3494]'
-                                    : 'border-white/10 bg-[#111111] text-white/50'
-                                }`}
-                              >
-                                {provider}
-                              </button>
-                            ))}
-                          </div>
-
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div>
-                              <label className="text-[10px] uppercase tracking-wider text-white/70 block mb-1 font-semibold">
-                                Sender Mobile Number <span className="text-[#C1121F]">*</span>
-                              </label>
-                              <input
-                                type="tel"
-                                required={paymentMethod === 'COD'}
-                                placeholder="01XXXXXXXXX"
-                                value={senderMfsPhone}
-                                onChange={(e) => setSenderMfsPhone(e.target.value)}
-                                className="w-full px-3 py-2.5 bg-[#111111] border border-white/20 text-white text-xs focus:outline-none focus:border-[#C7A55B]"
-                              />
-                            </div>
-
-                            <div>
-                              <label className="text-[10px] uppercase tracking-wider text-white/70 block mb-1 font-semibold">
-                                Transaction ID (TrxID) <span className="text-[#C1121F]">*</span>
-                              </label>
-                              <input
-                                type="text"
-                                required={paymentMethod === 'COD'}
-                                placeholder="e.g. BL92XK38"
-                                value={trxId}
-                                onChange={(e) => setTrxId(e.target.value.toUpperCase())}
-                                className="w-full px-3 py-2.5 bg-[#111111] border border-white/20 text-white text-xs font-mono tracking-wider focus:outline-none focus:border-[#C7A55B]"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                  {/* Method Used */}
+                  <div>
+                    <label className="text-[10px] uppercase font-bold text-white/70 block mb-1">
+                      Method Used
+                    </label>
+                    <select
+                      value={mfsMethod}
+                      onChange={(e) => setMfsMethod(e.target.value as any)}
+                      className="w-full px-3 py-2 bg-[#1a1a1a] border border-white/15 text-white text-xs rounded outline-none cursor-pointer"
+                    >
+                      <option value="bKash">bKash</option>
+                      <option value="Nagad">Nagad</option>
+                      <option value="Rocket">Rocket</option>
+                    </select>
                   </div>
 
-                  {/* Option 2: Pay Full Amount Online (SSLCommerz) */}
-                  <div
-                    onClick={() => setPaymentMethod('SSLCommerz/Card')}
-                    className={`p-4 border cursor-pointer transition-all ${
-                      paymentMethod === 'SSLCommerz/Card'
-                        ? 'bg-[#C1121F]/10 border-[#C1121F] ring-1 ring-[#C1121F]/50'
-                        : 'bg-[#111111] border-white/10 hover:border-white/30'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-3">
-                        <input
-                          type="radio"
-                          name="paymentMethod"
-                          checked={paymentMethod === 'SSLCommerz/Card'}
-                          onChange={() => setPaymentMethod('SSLCommerz/Card')}
-                          className="accent-[#C1121F] mt-1"
-                        />
-                        <div>
-                          <p className="text-xs font-bold text-white flex items-center gap-2 flex-wrap">
-                            <span>Pay 100% Online (Cards / bKash / Nagad / Banking)</span>
-                            <span className="px-2 py-0.5 bg-[#C7A55B]/20 text-[#C7A55B] text-[10px] uppercase font-bold rounded">
-                              Zero COD Hassle
-                            </span>
-                          </p>
-                          <p className="text-[11px] text-white/60 mt-1">
-                            Pay the full amount of <strong>{formatPrice(grandTotal)}</strong> online via SSLCommerz gateway. Nothing to pay upon delivery.
-                          </p>
-                          
-                          {/* Channel Badges */}
-                          <div className="flex items-center gap-2 mt-2 pt-2 border-t border-white/5 flex-wrap">
-                            <span className="px-1.5 py-0.5 bg-[#E2136E]/20 text-[#E2136E] text-[10px] font-bold">bKash</span>
-                            <span className="px-1.5 py-0.5 bg-[#F7921E]/20 text-[#F7921E] text-[10px] font-bold">Nagad</span>
-                            <span className="px-1.5 py-0.5 bg-[#8C3494]/20 text-[#8C3494] text-[10px] font-bold">Rocket</span>
-                            <span className="px-1.5 py-0.5 bg-blue-500/20 text-blue-400 text-[10px] font-bold">Visa / Mastercard</span>
-                          </div>
-                        </div>
-                      </div>
-                      <CreditCard className="w-5 h-5 text-[#C7A55B] shrink-0 mt-0.5" />
-                    </div>
+                  {/* Sender Number */}
+                  <div>
+                    <label className="text-[10px] uppercase font-bold text-white/70 block mb-1">
+                      Sender Number
+                    </label>
+                    <input
+                      type="tel"
+                      placeholder="01XXXXXXXXX"
+                      value={senderMfsPhone}
+                      onChange={(e) => setSenderMfsPhone(e.target.value)}
+                      className="w-full px-3 py-2 bg-[#1a1a1a] border border-white/15 text-white text-xs font-mono rounded outline-none"
+                    />
+                  </div>
+
+                  {/* Transaction ID (TrxID) */}
+                  <div>
+                    <label className="text-[10px] uppercase font-bold text-white/70 block mb-1">
+                      Transaction ID (TrxID)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. BLX987654"
+                      value={trxId}
+                      onChange={(e) => setTrxId(e.target.value)}
+                      className="w-full px-3 py-2 bg-[#1a1a1a] border border-white/15 text-white text-xs font-mono uppercase rounded outline-none"
+                    />
                   </div>
 
                 </div>
               </div>
 
-              {/* Submit CTA Button */}
+              {/* Submit Button */}
               <button
                 type="submit"
                 disabled={isSubmitting || cart.length === 0}
-                className="w-full py-4 bg-[#C1121F] hover:bg-[#a30f1a] text-white text-xs uppercase tracking-[0.2em] font-bold shadow-2xl flex items-center justify-center gap-2 disabled:opacity-50 transition-all cursor-pointer"
+                className="w-full py-4 bg-[#C1121F] hover:bg-[#a30f1a] disabled:opacity-50 text-white font-bold text-xs uppercase tracking-widest rounded transition-all shadow-xl flex items-center justify-center gap-2 cursor-pointer"
               >
                 {isSubmitting ? (
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Logging Order & Checking Stock...</span>
                 ) : (
-                  <Lock className="w-4 h-4 text-white" />
+                  <>
+                    <span>Confirm Order • Cash on Delivery</span>
+                    <span className="text-white/60">|</span>
+                    <span className="text-[#C7A55B]">Pay Delivery Charge ৳{deliveryCharge} Advance</span>
+                  </>
                 )}
-                <span>
-                  {isSubmitting 
-                    ? (paymentMethod === 'SSLCommerz/Card' ? 'Connecting to SSLCommerz...' : 'Verifying & Confirming...') 
-                    : (paymentMethod === 'SSLCommerz/Card' 
-                        ? `Pay Online Now (${formatPrice(grandTotal)})` 
-                        : `Confirm Order with Advance Delivery Fee (৳${actualDeliveryCharge})`
-                      )
-                  }
-                </span>
               </button>
+
+              <div className="flex items-center justify-center gap-6 text-[10px] text-white/50 uppercase tracking-wider">
+                <span className="flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-[#C7A55B]" />
+                  <span>Authenticity Guaranteed</span>
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Truck className="w-3.5 h-3.5 text-[#C7A55B]" />
+                  <span>Steadfast & Pathao Courier</span>
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <Banknote className="w-3.5 h-3.5 text-[#C7A55B]" />
+                  <span>COD at Delivery</span>
+                </span>
+              </div>
+
             </form>
+
           </div>
 
-          {/* Order Summary Sidebar Column */}
-          <div className="lg:w-5/12">
-            <div className="bg-[#161616] border border-white/10 p-6 sticky top-28 space-y-6 shadow-2xl">
-              <h3 className="font-serif-luxury text-xl font-bold text-white pb-4 border-b border-white/10 flex justify-between items-center">
-                <span>Order Summary</span>
-                <span className="text-xs text-[#C7A55B] font-bold">{cart.length} Item{cart.length !== 1 ? 's' : ''}</span>
-              </h3>
+          {/* Order Summary & Breakdown (5 cols) */}
+          <div className="lg:col-span-5 space-y-6">
+            
+            <div className="bg-[#141414] border border-white/10 p-6 rounded-lg space-y-6 shadow-xl sticky top-24">
+              
+              <div className="flex items-center justify-between pb-3 border-b border-white/10">
+                <h3 className="font-serif-luxury text-base font-bold text-white tracking-wide">
+                  Order Summary
+                </h3>
+                <span className="text-xs text-[#C7A55B] font-mono font-bold">
+                  {cart.reduce((s, i) => s + i.quantity, 0)} Items
+                </span>
+              </div>
 
-              {/* Cart Items List */}
-              <div className="space-y-4 max-h-72 overflow-y-auto pr-1 divide-y divide-white/5">
-                {cart.map(item => (
+              {/* Cart Items Mini List */}
+              <div className="space-y-3 max-h-60 overflow-y-auto pr-1 divide-y divide-white/5">
+                {cart.map((item) => (
                   <div key={item.id} className="pt-3 first:pt-0 flex items-center gap-3">
                     <img
-                      src={optimizeImageUrl(item.product.images[0], 150, 75)}
-                      alt={`${item.product.name} in ${item.selectedColor.name} (EU ${item.selectedSize})`}
-                      loading="lazy"
-                      decoding="async"
-                      referrerPolicy="no-referrer"
-                      className="w-14 h-14 bg-[#111111] object-contain border border-white/10 shrink-0"
+                      src={optimizeImageUrl(item.product?.images?.[0] || '', 120, 60)}
+                      alt={item.product?.name || 'Product'}
+                      className="w-12 h-12 bg-black object-contain border border-white/10 rounded shrink-0"
                     />
-                    <div className="flex-grow min-w-0">
-                      <p className="text-xs font-bold text-white truncate">{item.product.name}</p>
-                      <p className="text-[10px] text-white/50 mt-0.5">
-                        Size: EU {item.selectedSize} • {item.selectedColor.name} • Qty: {item.quantity}
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-xs font-bold text-white truncate">{item.product?.name}</h4>
+                      <p className="text-[10px] text-white/50">
+                        Size: {item.selectedSize} • Color: {item.selectedColor?.name || 'Standard'} • Qty: {item.quantity}
                       </p>
                     </div>
-                    <p className="text-xs font-bold text-[#C7A55B] shrink-0">
+                    <span className="text-xs font-bold text-[#C7A55B] font-mono shrink-0">
                       {formatPrice(item.product.price * item.quantity)}
-                    </p>
+                    </span>
                   </div>
                 ))}
               </div>
 
-              {/* Delivery Zone Details */}
-              <div className="p-3.5 bg-[#111111] border border-white/10 text-xs space-y-1.5">
-                <div className="flex items-center justify-between text-white/90 font-semibold">
-                  <span className="flex items-center gap-1.5">
-                    <Truck className="w-4 h-4 text-[#C7A55B]" />
-                    <span>{isInsideDhaka ? 'Inside Dhaka (৳100)' : 'Outside Dhaka (৳160)'}</span>
-                  </span>
-                  <span className="text-[#C7A55B] font-mono font-bold">
-                    ৳ {actualDeliveryCharge}
-                  </span>
-                </div>
-                <p className="text-[11px] text-white/60">
-                  Estimated Delivery: <strong className="text-white">{selectedDistrict.estimatedDays}</strong>
-                </p>
-                <p className="text-[10px] text-emerald-400">
-                  Courier Partner: <strong>{selectedCourier} Express Delivery</strong>
-                </p>
-              </div>
-
-              {/* Financial Calculation Breakdown */}
-              <div className="space-y-2.5 text-xs text-white/70 pt-2 border-t border-white/10">
-                <div className="flex justify-between">
-                  <span>Product Subtotal</span>
-                  <span className="font-semibold text-white">{formatPrice(subtotal)}</span>
+              {/* Exact Breakdown Requested by Owner */}
+              <div className="space-y-3 pt-3 border-t border-white/10 text-xs">
+                
+                {/* Products Total */}
+                <div className="flex justify-between text-white/80">
+                  <span>Products Total</span>
+                  <span className="font-mono font-semibold text-white">{formatPrice(subtotal)}</span>
                 </div>
 
+                {/* Discount */}
                 {discountAmount > 0 && (
                   <div className="flex justify-between text-[#C7A55B]">
-                    <span>Promo Savings</span>
-                    <span className="font-semibold">-{formatPrice(discountAmount)}</span>
+                    <span>Discount</span>
+                    <span className="font-mono font-semibold">-{formatPrice(discountAmount)}</span>
                   </div>
                 )}
 
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-1.5">
-                    <span>Advance Delivery Fee</span>
-                    <span className="text-[10px] text-white/40">({isInsideDhaka ? 'Dhaka City ৳100' : 'Outside Dhaka ৳160'})</span>
-                  </div>
-                  <span className="font-semibold text-white">
-                    ৳ {actualDeliveryCharge}
+                {/* Parcel Weight */}
+                <div className="flex justify-between text-white/60 text-[11px]">
+                  <span className="flex items-center gap-1">
+                    <Scale className="w-3.5 h-3.5" />
+                    <span>Parcel Total Weight</span>
                   </span>
+                  <span className="font-mono">{(totalWeightGrams / 1000).toFixed(2)} kg</span>
                 </div>
 
-                <div className="flex justify-between text-base font-bold text-white pt-3 border-t border-white/10">
-                  <span>Total Order Value</span>
-                  <span className="text-white text-lg">{formatPrice(grandTotal)}</span>
+                {/* Delivery Charge (Auto calculated) */}
+                <div className="flex justify-between text-white/80">
+                  <span className="flex items-center gap-1.5">
+                    <span>Delivery Charge ({isInsideDhaka ? 'Inside Dhaka' : 'Outside Dhaka'})</span>
+                  </span>
+                  <span className="font-mono font-semibold text-white">{formatPrice(deliveryCharge)}</span>
                 </div>
 
-                {/* Payable Now vs Remaining on Delivery */}
-                <div className="p-3 bg-white/5 border border-white/10 space-y-1.5 mt-2">
-                  <div className="flex justify-between text-xs font-bold text-[#C7A55B]">
-                    <span>Payable Now (Advance):</span>
-                    <span>{formatPrice(payableNow)}</span>
+                {/* Clear Split Boxes */}
+                <div className="pt-3 border-t border-white/10 space-y-2">
+                  
+                  {/* Advance: Delivery Charge */}
+                  <div className="p-3 bg-[#C7A55B]/10 border border-[#C7A55B]/40 rounded flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] uppercase tracking-wider text-[#C7A55B] font-bold block">
+                        Pay now (advance)
+                      </span>
+                      <span className="text-[11px] text-white/70">Delivery charge via bKash/Nagad/Rocket</span>
+                    </div>
+                    <span className="font-mono text-base font-bold text-[#C7A55B]">
+                      {formatPrice(deliveryCharge)}
+                    </span>
                   </div>
-                  <div className="flex justify-between text-xs text-white/80">
-                    <span>Payable on Delivery:</span>
-                    <span className="font-bold text-emerald-400">{formatPrice(remainingDueOnDelivery)}</span>
+
+                  {/* COD: Products total minus discount */}
+                  <div className="p-3 bg-white/5 border border-white/15 rounded flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] uppercase tracking-wider text-emerald-400 font-bold block">
+                        Pay on delivery (COD)
+                      </span>
+                      <span className="text-[11px] text-white/70">Products total upon parcel handover</span>
+                    </div>
+                    <span className="font-mono text-base font-bold text-white">
+                      {formatPrice(codAmountToCollect)}
+                    </span>
                   </div>
+
                 </div>
+
+                {/* Grand Total */}
+                <div className="pt-2 flex justify-between items-center text-sm font-bold text-white">
+                  <span>Grand Total</span>
+                  <span className="font-mono text-lg text-[#C7A55B]">{formatPrice(grandTotal)}</span>
+                </div>
+
               </div>
 
-              {/* Production & Verification Guarantee */}
-              <div className="p-3.5 bg-white/5 border border-white/10 text-[10px] text-white/60 space-y-1">
-                <p className="font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>KINGSMAN Quality & Dispatch Guarantee</span>
-                </p>
+              {/* Courier Partner Info */}
+              <div className="p-3 bg-[#111111] border border-white/10 rounded space-y-1.5 text-[11px] text-white/60">
+                <div className="flex items-center gap-2 text-white font-bold text-xs">
+                  <Truck className="w-3.5 h-3.5 text-[#C7A55B]" />
+                  <span>Official Delivery Partner</span>
+                </div>
                 <p>
-                  Every pair is thoroughly inspected in our Dhaka dispatch office before handover to Steadfast or Pathao.
+                  Dispatched via <strong className="text-white">Steadfast Express</strong> or <strong className="text-white">Pathao Courier</strong>. The parcel is delivered to your doorstep with tracking code provided upon dispatch.
                 </p>
               </div>
+
             </div>
+
           </div>
 
         </div>

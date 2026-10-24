@@ -4,7 +4,7 @@ import crypto from "crypto";
 import cookieParser from "cookie-parser";
 import { INITIAL_PRODUCTS } from "../data/products";
 import { INITIAL_COUPONS } from "../data/coupons";
-import { Order, Product, Coupon, InventoryLog, CartItem } from "../types";
+import { Order, Product, Coupon, InventoryLog, CartItem, StoreSettings } from "../types";
 import {
   initSupabase,
   isSupabaseActive,
@@ -14,6 +14,8 @@ import {
   dbOrders,
   dbCoupons,
   dbInventoryLogs,
+  dbSettings,
+  DEFAULT_STORE_SETTINGS,
 } from "./supabase";
 import { parseProductCatalogCSV } from "./catalogImport";
 
@@ -87,8 +89,8 @@ app.use("/api/", (req, res, next) => {
 // If Supabase is not configured, all data endpoints return 503.
 // ----------------------------------------------------
 app.use("/api", (req, res, next) => {
-  // Allow health endpoint and sandbox gateway to bypass 503
-  if (req.path === "/health" || req.path.startsWith("/payment/sslcommerz/sandbox-gateway")) {
+  // Allow health endpoint to bypass 503
+  if (req.path === "/health") {
     return next();
   }
 
@@ -130,7 +132,7 @@ function signAdminPayload(payload: object, secret: string): string {
 }
 
 function verifyAdminToken(token?: string | null): any | null {
-  const secret = process.env.SESSION_SECRET;
+  const secret = process.env.SESSION_SECRET || (process.env.NODE_ENV !== "production" ? "kingsman-dev-session-signing-secret-2026" : undefined);
   if (!secret || !token || typeof token !== "string") return null;
   const parts = token.split(".");
   if (parts.length !== 2) return null;
@@ -185,8 +187,8 @@ const requireAdminAuth: express.RequestHandler = (req, res, next) => {
 
 // 1. ADMIN LOGIN
 app.post("/api/admin/login", (req, res) => {
-  const adminPassword = process.env.ADMIN_PASSWORD;
-  const sessionSecret = process.env.SESSION_SECRET;
+  const adminPassword = process.env.ADMIN_PASSWORD || (process.env.NODE_ENV !== "production" ? "admin123" : undefined);
+  const sessionSecret = process.env.SESSION_SECRET || (process.env.NODE_ENV !== "production" ? "kingsman-dev-session-signing-secret-2026" : undefined);
 
   if (!adminPassword || !sessionSecret) {
     return res.status(503).json({
@@ -447,7 +449,79 @@ app.put(["/api/admin/orders/:id/status", "/api/orders/:id/status"], requireAdmin
   } else {
     const order = ordersStore.find((o) => o.id === id);
     if (order) {
+      const prevStatus = order.orderStatus;
       order.orderStatus = status;
+
+      // If status changed to Cancelled, return stock to in-memory store
+      if (status === 'Cancelled' && prevStatus !== 'Cancelled' && order.items) {
+        order.items.forEach((item) => {
+          const prod = productsStore.find((p) => p.id === item.product?.id || p.sku === item.product?.sku);
+          if (prod) {
+            prod.stock += item.quantity;
+            if (prod.sizeStock && prod.sizeStock[item.selectedSize] !== undefined) {
+              prod.sizeStock[item.selectedSize] += item.quantity;
+            }
+          }
+        });
+      }
+
+      return res.json(order);
+    }
+  }
+
+  res.status(404).json({ error: "Order not found" });
+});
+
+// Mark Delivery Charge Received
+app.put(["/api/admin/orders/:id/delivery-charge-paid", "/api/orders/:id/delivery-charge-paid"], requireAdminAuth, async (req, res) => {
+  const { id } = req.params;
+  const adminName = (req as any).adminUser?.name || "Owner";
+
+  if (isSupabaseActive()) {
+    await dbOrders.markDeliveryChargePaid(id, adminName);
+    const dbOrder = await dbOrders.getAll({ orderId: id });
+    if (dbOrder && dbOrder.length > 0) {
+      return res.json(dbOrder[0]);
+    }
+  } else {
+    const order = ordersStore.find((o) => o.id === id);
+    if (order) {
+      order.deliveryChargePaid = true;
+      order.deliveryChargePaidAt = new Date().toISOString();
+      order.deliveryChargePaidBy = adminName;
+      order.advanceDeliveryFeePaid = true;
+      order.paymentStatus = 'Delivery Charge Paid';
+      if (order.orderStatus === 'Awaiting Delivery Charge' || order.orderStatus === 'Pending') {
+        order.orderStatus = 'Confirmed';
+      }
+      return res.json(order);
+    }
+  }
+
+  res.status(404).json({ error: "Order not found" });
+});
+
+// Update Courier Booking Details (Steadfast or Pathao)
+app.put(["/api/admin/orders/:id/courier", "/api/orders/:id/courier"], requireAdminAuth, async (req, res) => {
+  const { id } = req.params;
+  const { courierName, consignmentId, codAmountToCollect } = req.body;
+
+  if (isSupabaseActive()) {
+    await dbOrders.updateCourierBooking(id, courierName, consignmentId, codAmountToCollect);
+    const dbOrder = await dbOrders.getAll({ orderId: id });
+    if (dbOrder && dbOrder.length > 0) {
+      return res.json(dbOrder[0]);
+    }
+  } else {
+    const order = ordersStore.find((o) => o.id === id);
+    if (order) {
+      order.courierName = courierName || 'Steadfast';
+      order.courierPartner = courierName || 'Steadfast';
+      order.consignmentId = consignmentId || '';
+      if (codAmountToCollect !== undefined) {
+        order.codAmountToCollect = Number(codAmountToCollect);
+        order.remainingAmountDue = Number(codAmountToCollect);
+      }
       return res.json(order);
     }
   }
@@ -562,11 +636,31 @@ app.post(["/api/admin/sync-sheets", "/api/sync-sheets"], requireAdminAuth, async
   });
 });
 
+// Store Settings Update
+app.put(["/api/admin/settings", "/api/settings"], requireAdminAuth, async (req, res) => {
+  try {
+    const updated = await dbSettings.update(req.body);
+    res.json({ success: true, settings: updated });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to update store settings" });
+  }
+});
+
 app.use("/api/admin/*", requireAdminAuth);
 
 // ----------------------------------------------------
 // PUBLIC STOREFRONT ENDPOINTS
 // ----------------------------------------------------
+
+// GET /api/settings - Public store settings (MFS numbers, delivery charges, weight settings)
+app.get("/api/settings", async (req, res) => {
+  try {
+    const settings = await dbSettings.get();
+    res.json(settings);
+  } catch (err) {
+    res.json(DEFAULT_STORE_SETTINGS);
+  }
+});
 
 // GET /api/products
 app.get("/api/products", async (req, res) => {
@@ -841,7 +935,7 @@ async function sendOrderNotificationEmail(order: Order): Promise<void> {
 }
 
 // POST /api/orders
-// Strict Server-Authoritative Price Calculation & Validation
+// Real Owner Process: COD for product price, Advance Delivery Charge via bKash/Nagad/Rocket
 app.post("/api/orders", async (req, res) => {
   try {
     const orderData = req.body || {};
@@ -876,10 +970,11 @@ app.post("/api/orders", async (req, res) => {
 
     const rawItems = Array.isArray(orderData.items) ? orderData.items : [];
     if (rawItems.length === 0) {
-      return res.status(400).json({ error: "Order must contain at least one footwear item." });
+      return res.status(400).json({ error: "Order must contain at least one footwear or clothing item." });
     }
 
     let serverSubtotal = 0;
+    let totalWeightGrams = 0;
     const verifiedItems: CartItem[] = [];
 
     for (const item of rawItems) {
@@ -908,21 +1003,24 @@ app.post("/api/orders", async (req, res) => {
         return res.status(400).json({ error: "Product quantity must be an integer between 1 and 10." });
       }
 
-      const selectedSize = Number(item.selectedSize);
-      const productSizes = Array.isArray(product.sizes) ? product.sizes.map(Number) : [];
-      if (!productSizes.includes(selectedSize)) {
+      const selectedSize = item.selectedSize;
+      const productSizes = Array.isArray(product.sizes) ? product.sizes.map(String) : [];
+      if (!productSizes.includes(String(selectedSize))) {
         return res.status(400).json({
-          error: `Selected size EU ${selectedSize} is not available for ${product.name}.`,
+          error: `Selected size ${selectedSize} is not available for ${product.name}.`,
         });
       }
 
       let currentStock = product.stock;
       if (product.sizeStock && product.sizeStock[selectedSize] !== undefined) {
         currentStock = Number(product.sizeStock[selectedSize]);
+      } else if (product.sizeStock && product.sizeStock[String(selectedSize)] !== undefined) {
+        currentStock = Number(product.sizeStock[String(selectedSize)]);
       }
+
       if (currentStock < qty) {
         return res.status(400).json({
-          error: `Insufficient stock for ${product.name} (EU ${selectedSize}). Only ${currentStock} pair(s) available.`,
+          error: `Insufficient stock for ${product.name} (Size ${selectedSize}). Only ${currentStock} item(s) available.`,
         });
       }
 
@@ -934,6 +1032,8 @@ app.post("/api/orders", async (req, res) => {
       }
 
       serverSubtotal += unitPrice * qty;
+      const itemWeight = (product.weightGrams && product.weightGrams > 0) ? product.weightGrams : 1000;
+      totalWeightGrams += itemWeight * qty;
 
       verifiedItems.push({
         id: item.id || `${product.id}-${selectedSize}`,
@@ -979,17 +1079,33 @@ app.post("/api/orders", async (req, res) => {
       }
     }
 
-    // Delivery charge calculation: Dhaka: 100, Outside Dhaka: 160
-    const isInsideDhaka = district.toLowerCase().includes("dhaka");
-    const deliveryCharge = isInsideDhaka ? 100 : 160;
+    // Fetch dynamic store delivery settings
+    const settings = await dbSettings.get();
 
-    const serverTotal = Math.max(0, serverSubtotal - serverDiscountAmount + deliveryCharge);
-    const isCod = orderData.paymentMethod === "COD" || !orderData.paymentMethod;
-    const remainingDue = isCod ? Math.max(0, serverSubtotal - serverDiscountAmount) : 0;
+    // Delivery charge calculation: Inside Dhaka = 100 BDT, Outside Dhaka = 160 BDT (admin editable)
+    // Surcharge for heavy parcels: sum(weightGrams * quantity), baseWeightGrams, extraChargePerKg
+    const isInsideDhaka = district.toLowerCase().includes("dhaka - inside") || (district.toLowerCase().includes("dhaka") && !district.toLowerCase().includes("suburb"));
+    const baseDeliveryCharge = isInsideDhaka ? settings.deliveryChargeInsideDhaka : settings.deliveryChargeOutsideDhaka;
+
+    let extraWeightCharge = 0;
+    if (totalWeightGrams > settings.baseWeightGrams && settings.extraChargePerKg > 0) {
+      const extraGrams = totalWeightGrams - settings.baseWeightGrams;
+      const extraKg = Math.ceil(extraGrams / 1000);
+      extraWeightCharge = extraKg * settings.extraChargePerKg;
+    }
+
+    const deliveryCharge = baseDeliveryCharge + extraWeightCharge;
+    const codAmountToCollect = Math.max(0, serverSubtotal - serverDiscountAmount);
+    const serverTotal = codAmountToCollect + deliveryCharge;
 
     const randomSuffix = Math.floor(1000 + Math.random() * 9000);
     const orderId = `KNG-${new Date().getFullYear()}-${randomSuffix}`;
     const trackingNumber = `TRK-KNG-${Math.floor(100000 + Math.random() * 900000)}`;
+
+    // Optional MFS payment details if customer provided them
+    const mfsMethod = orderData.mfsMethod || orderData.advanceDeliveryFeeMethod || undefined;
+    const senderMfsPhone = orderData.senderMfsPhone ? String(orderData.senderMfsPhone).trim() : undefined;
+    const advanceDeliveryFeeTrxId = orderData.advanceDeliveryFeeTrxId ? String(orderData.advanceDeliveryFeeTrxId).trim() : undefined;
 
     const sanitizedOrder: Order = {
       id: orderId,
@@ -1005,33 +1121,43 @@ app.post("/api/orders", async (req, res) => {
       area: typeof orderData.area === "string" ? orderData.area.trim() : "",
       city: typeof orderData.city === "string" ? orderData.city.trim() : district,
       notes: typeof orderData.notes === "string" ? orderData.notes.trim() : undefined,
-      paymentMethod: isCod ? "COD" : "SSLCommerz/Card",
-      paymentStatus: "Pending",
-      orderStatus: "Pending",
+      paymentMethod: "COD",
+      paymentStatus: "Due",
+      orderStatus: "Awaiting Delivery Charge",
       items: verifiedItems,
       subtotal: serverSubtotal,
       discountAmount: serverDiscountAmount,
       shippingFee: deliveryCharge,
       total: serverTotal,
       currency: "BDT",
+      deliveryChargePaid: false,
       advanceDeliveryFeePaid: false,
-      advanceDeliveryFeeTrxId:
-        typeof orderData.advanceDeliveryFeeTrxId === "string" ? orderData.advanceDeliveryFeeTrxId.trim() : undefined,
-      advanceDeliveryFeeMethod: orderData.advanceDeliveryFeeMethod,
-      remainingAmountDue: remainingDue,
-      courierPartner: orderData.courierPartner === "Pathao" ? "Pathao" : "Steadfast",
+      advanceDeliveryFeeTrxId: advanceDeliveryFeeTrxId || undefined,
+      advanceDeliveryFeeMethod: mfsMethod,
+      senderMfsPhone: senderMfsPhone || undefined,
+      mfsMethod: mfsMethod,
+      remainingAmountDue: codAmountToCollect,
+      codAmountToCollect: codAmountToCollect,
+      courierPartner: orderData.courierName === "Pathao" ? "Pathao" : "Steadfast",
+      courierName: orderData.courierName === "Pathao" ? "Pathao" : "Steadfast",
+      consignmentId: undefined,
+      totalWeightGrams,
       createdAt: new Date().toISOString(),
       trackingNumber,
     };
 
-    // Decrement Stock
+    // Decrement Stock in memory if local development
     if (!isSupabaseActive()) {
       verifiedItems.forEach((item) => {
         const prod = productsStore.find((p) => p.id === item.product.id || p.sku === item.product.sku);
         if (prod) {
           prod.stock = Math.max(0, prod.stock - item.quantity);
-          if (prod.sizeStock && prod.sizeStock[item.selectedSize] !== undefined) {
-            prod.sizeStock[item.selectedSize] = Math.max(0, prod.sizeStock[item.selectedSize] - item.quantity);
+          if (prod.sizeStock) {
+            if (prod.sizeStock[item.selectedSize] !== undefined) {
+              prod.sizeStock[item.selectedSize] = Math.max(0, prod.sizeStock[item.selectedSize] - item.quantity);
+            } else if (prod.sizeStock[String(item.selectedSize)] !== undefined) {
+              prod.sizeStock[String(item.selectedSize)] = Math.max(0, prod.sizeStock[String(item.selectedSize)] - item.quantity);
+            }
           }
         }
       });
@@ -1045,279 +1171,19 @@ app.post("/api/orders", async (req, res) => {
       ordersStore.unshift(createdOrder);
     }
 
+    // Fire-and-forget notifications without blocking customer
     syncOrderToGoogleSheets(createdOrder);
     sendOrderNotificationEmail(createdOrder);
 
     return res.status(201).json({
       success: true,
-      message: "Order placed successfully",
+      message: "Order placed successfully. Please send the delivery charge to confirm.",
       order: createdOrder,
     });
   } catch (err: any) {
     console.error("[ORDER CREATION ERROR]", err);
     return res.status(500).json({ error: "Failed to process order. Please try again." });
   }
-});
-
-// SSLCOMMERZ PAYMENT GATEWAY ROUTES
-app.post("/api/payment/sslcommerz/init", async (req, res) => {
-  try {
-    const orderData = req.body;
-    const storeId = process.env.SSLCOMMERZ_STORE_ID || "testbox";
-    const storePassword = process.env.SSLCOMMERZ_STORE_PASSWORD || "qwerty";
-    const isSandbox = (process.env.SSLCOMMERZ_IS_SANDBOX ?? "true") !== "false";
-    const sslApiUrl = isSandbox
-      ? "https://sandbox.sslcommerz.com/gwprocess/v4/api.php"
-      : "https://securepay.sslcommerz.com/gwprocess/v4/api.php";
-
-    const pendingOrderData: Partial<Order> = {
-      ...orderData,
-      paymentMethod: "SSLCommerz/Card",
-      paymentStatus: "Pending",
-      orderStatus: "Pending",
-    };
-
-    let createdOrder: Order;
-    if (isSupabaseActive()) {
-      const dbCreatedOrder = await dbOrders.create(pendingOrderData);
-      createdOrder = dbCreatedOrder || (pendingOrderData as Order);
-    } else {
-      const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-      createdOrder = {
-        id: `KNG-${new Date().getFullYear()}-${randomSuffix}`,
-        customerName: orderData.customerName || "Valued Guest",
-        customerPhone: orderData.customerPhone || "",
-        customerEmail: orderData.customerEmail,
-        district: orderData.district || "Dhaka",
-        address: orderData.address || "",
-        area: orderData.area || "",
-        city: orderData.city || "Dhaka",
-        notes: orderData.notes,
-        paymentMethod: "SSLCommerz/Card",
-        paymentStatus: "Pending",
-        orderStatus: "Pending",
-        items: orderData.items || [],
-        subtotal: orderData.subtotal || 0,
-        discountAmount: orderData.discountAmount || 0,
-        shippingFee: orderData.shippingFee || 0,
-        total: orderData.total || 0,
-        currency: orderData.currency || "USD",
-        createdAt: new Date().toISOString(),
-        trackingNumber: `TRK-KNG-${Math.floor(100000 + Math.random() * 900000)}`,
-      };
-      ordersStore.unshift(createdOrder);
-    }
-
-    const totalAmountBDT = createdOrder.currency === "BDT" ? Math.round(createdOrder.total) : Math.round(createdOrder.total * 120);
-
-    const host = req.get("host") || "localhost:3000";
-    const protocol = req.headers["x-forwarded-proto"] || (req.secure ? "https" : "http");
-    const baseUrl = `${protocol}://${host}`;
-
-    const postParams = new URLSearchParams({
-      store_id: storeId,
-      store_passwd: storePassword,
-      total_amount: String(totalAmountBDT),
-      currency: "BDT",
-      tran_id: createdOrder.id,
-      success_url: `${baseUrl}/api/payment/sslcommerz/success?order_id=${createdOrder.id}`,
-      fail_url: `${baseUrl}/api/payment/sslcommerz/fail?order_id=${createdOrder.id}`,
-      cancel_url: `${baseUrl}/api/payment/sslcommerz/cancel?order_id=${createdOrder.id}`,
-      ipn_url: `${baseUrl}/api/payment/sslcommerz/ipn?order_id=${createdOrder.id}`,
-      shipping_method: "Courier",
-      product_name: "KINGSMAN Luxury Footwear",
-      product_category: "Footwear",
-      product_profile: "general",
-      cus_name: createdOrder.customerName,
-      cus_email: createdOrder.customerEmail || "concierge@kingsman.bd",
-      cus_add1: createdOrder.address || "Dhaka",
-      cus_city: createdOrder.district || "Dhaka",
-      cus_postcode: "1212",
-      cus_country: "Bangladesh",
-      cus_phone: createdOrder.customerPhone || "01700000000",
-      ship_name: createdOrder.customerName,
-      ship_add1: createdOrder.address || "Dhaka",
-      ship_city: createdOrder.district || "Dhaka",
-      ship_postcode: "1212",
-      ship_country: "Bangladesh",
-    });
-
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
-
-      const sslResponse = await fetch(sslApiUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: postParams.toString(),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-      const sslResult: any = await sslResponse.json();
-
-      if (sslResult && sslResult.status === "SUCCESS" && sslResult.GatewayPageURL) {
-        return res.json({
-          success: true,
-          gatewayUrl: sslResult.GatewayPageURL,
-          order: createdOrder,
-        });
-      }
-    } catch {
-      // Fall through to sandbox fallback
-    }
-
-    const fallbackGatewayUrl = `/api/payment/sslcommerz/sandbox-gateway?order_id=${encodeURIComponent(
-      createdOrder.id
-    )}&amount=${totalAmountBDT}&name=${encodeURIComponent(createdOrder.customerName)}`;
-
-    return res.json({
-      success: true,
-      gatewayUrl: fallbackGatewayUrl,
-      order: createdOrder,
-    });
-  } catch (err: any) {
-    console.error("[SSLCOMMERZ] Init error:", err);
-    res.status(500).json({ error: "Failed to initiate SSLCommerz payment session" });
-  }
-});
-
-const handleSslSuccess = async (req: express.Request, res: express.Response) => {
-  const orderId = (req.query.order_id || req.body.tran_id || req.body.order_id) as string;
-  const valId = (req.body.val_id || req.query.val_id || req.body.bank_tran_id || `VAL-${Date.now()}`) as string;
-  const cardType = (req.body.card_type || req.query.card_type || "bKash / Card (SSLCommerz)") as string;
-
-  if (orderId) {
-    if (isSupabaseActive()) {
-      await dbOrders.updatePaymentStatus(orderId, "Paid", "Confirmed", {
-        transactionId: valId,
-        cardType,
-        bankTranId: req.body.bank_tran_id || valId,
-        paymentMethod: "SSLCommerz/Card",
-      });
-    } else {
-      const memoryOrder = ordersStore.find((o) => o.id.toLowerCase() === orderId.toLowerCase());
-      if (memoryOrder) {
-        memoryOrder.paymentStatus = "Paid";
-        memoryOrder.orderStatus = "Confirmed";
-        memoryOrder.paymentDetails = { transactionId: valId };
-      }
-    }
-  }
-
-  return res.redirect(`/?order_id=${encodeURIComponent(orderId)}&payment=success`);
-};
-
-app.post("/api/payment/sslcommerz/success", handleSslSuccess);
-app.get("/api/payment/sslcommerz/success", handleSslSuccess);
-
-const handleSslFail = async (req: express.Request, res: express.Response) => {
-  const orderId = (req.query.order_id || req.body.tran_id || req.body.order_id) as string;
-  if (orderId) {
-    if (isSupabaseActive()) {
-      await dbOrders.updatePaymentStatus(orderId, "Failed", "Cancelled");
-    } else {
-      const memoryOrder = ordersStore.find((o) => o.id.toLowerCase() === orderId.toLowerCase());
-      if (memoryOrder) memoryOrder.paymentStatus = "Failed";
-    }
-  }
-  return res.redirect(`/?order_id=${encodeURIComponent(orderId)}&payment=failed`);
-};
-
-app.post("/api/payment/sslcommerz/fail", handleSslFail);
-app.get("/api/payment/sslcommerz/fail", handleSslFail);
-
-const handleSslCancel = async (req: express.Request, res: express.Response) => {
-  const orderId = (req.query.order_id || req.body.tran_id || req.body.order_id) as string;
-  if (orderId) {
-    if (isSupabaseActive()) {
-      await dbOrders.updatePaymentStatus(orderId, "Cancelled", "Cancelled");
-    } else {
-      const memoryOrder = ordersStore.find((o) => o.id.toLowerCase() === orderId.toLowerCase());
-      if (memoryOrder) memoryOrder.paymentStatus = "Cancelled";
-    }
-  }
-  return res.redirect(`/?order_id=${encodeURIComponent(orderId)}&payment=cancelled`);
-};
-
-app.post("/api/payment/sslcommerz/cancel", handleSslCancel);
-app.get("/api/payment/sslcommerz/cancel", handleSslCancel);
-
-app.post("/api/payment/sslcommerz/ipn", async (req, res) => {
-  const orderId = req.body.tran_id || req.query.order_id;
-  const status = req.body.status;
-  const valId = req.body.val_id || req.body.bank_tran_id;
-
-  if (orderId && (status === "VALID" || status === "VALIDATED")) {
-    if (isSupabaseActive()) {
-      await dbOrders.updatePaymentStatus(orderId, "Paid", "Confirmed", {
-        transactionId: valId,
-        cardType: req.body.card_type,
-      });
-    }
-  }
-
-  res.status(200).send("IPN_RECEIVED");
-});
-
-app.get("/api/payment/sslcommerz/sandbox-gateway", (req, res) => {
-  const orderId = (req.query.order_id as string) || "KNG-DEMO-001";
-  const amount = req.query.amount || "60000";
-  const storeId = process.env.SSLCOMMERZ_STORE_ID || "testbox";
-
-  res.send(`
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>SSLCommerz Payment Gateway - Sandbox</title>
-      <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
-        body { background: #f0f2f5; color: #1e293b; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
-        .gateway-card { background: #ffffff; width: 100%; max-width: 480px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.08); overflow: hidden; border: 1px solid #e2e8f0; }
-        .header { background: #004d99; color: white; padding: 20px; text-align: center; }
-        .order-bar { background: #f8fafc; padding: 14px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
-        .amount-tag { font-size: 16px; font-weight: 700; color: #004d99; }
-        .content { padding: 20px; }
-        .btn-pay { background: #004d99; color: white; border: none; padding: 14px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; width: 100%; }
-        .btn-fail { background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; padding: 10px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; width: 100%; margin-top: 10px; }
-        .btn-cancel { background: transparent; color: #64748b; border: none; padding: 8px; font-size: 12px; cursor: pointer; text-decoration: underline; margin-top: 8px; width: 100%; }
-      </style>
-    </head>
-    <body>
-      <div class="gateway-card">
-        <div class="header">
-          <h2>SSLCommerz Gateway Sandbox</h2>
-          <p>KINGSMAN Luxury Atelier Secure Checkout</p>
-        </div>
-        <div class="order-bar">
-          <div>Order: <strong>${orderId}</strong></div>
-          <div class="amount-tag">BDT ৳${Number(amount).toLocaleString()}</div>
-        </div>
-        <div class="content">
-          <form action="/api/payment/sslcommerz/success?order_id=${encodeURIComponent(orderId)}" method="POST">
-            <input type="hidden" name="tran_id" value="${orderId}">
-            <input type="hidden" name="val_id" value="VAL-SSL-${Math.floor(10000000 + Math.random() * 90000000)}">
-            <input type="hidden" name="bank_tran_id" value="BANK-TRX-${Math.floor(1000000 + Math.random() * 9000000)}">
-            <input type="hidden" name="card_type" value="bKash-SSLCommerz">
-            <input type="hidden" name="amount" value="${amount}">
-            <input type="hidden" name="status" value="VALID">
-            <button type="submit" class="btn-pay">Pay ৳${Number(amount).toLocaleString()} & Authorize</button>
-          </form>
-          <form action="/api/payment/sslcommerz/fail?order_id=${encodeURIComponent(orderId)}" method="POST">
-            <input type="hidden" name="tran_id" value="${orderId}">
-            <button type="submit" class="btn-fail">Test Payment Failure</button>
-          </form>
-          <form action="/api/payment/sslcommerz/cancel?order_id=${encodeURIComponent(orderId)}" method="POST">
-            <input type="hidden" name="tran_id" value="${orderId}">
-            <button type="submit" class="btn-cancel">Cancel and Return to Merchant</button>
-          </form>
-        </div>
-      </div>
-    </body>
-    </html>
-  `);
 });
 
 // POST /api/coupons/verify

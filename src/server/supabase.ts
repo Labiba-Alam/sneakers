@@ -1,7 +1,20 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { INITIAL_PRODUCTS } from '../data/products';
 import { INITIAL_COUPONS } from '../data/coupons';
-import { Product, Order, Coupon, CartItem, InventoryLog, CustomerAccount } from '../types';
+import { Product, Order, Coupon, CartItem, InventoryLog, CustomerAccount, StoreSettings } from '../types';
+
+export const DEFAULT_STORE_SETTINGS: StoreSettings = {
+  bkashNumber: '01581054939',
+  nagadNumber: '01581054939',
+  rocketNumber: '01581054939',
+  whatsappNumber: '01581054939',
+  deliveryChargeInsideDhaka: 100,
+  deliveryChargeOutsideDhaka: 160,
+  baseWeightGrams: 1000,
+  extraChargePerKg: 0,
+};
+
+let inMemoryStoreSettings: StoreSettings = { ...DEFAULT_STORE_SETTINGS };
 
 let supabaseClient: SupabaseClient | null = null;
 let isSupabaseConfiguredState = false;
@@ -503,6 +516,12 @@ export const dbOrders = {
           };
         });
 
+        const isDelivPaid = Boolean(row.delivery_charge_paid ?? row.advance_delivery_fee_paid);
+        const codAmount = Number(
+          row.cod_amount_to_collect ??
+          (row.remaining_amount_due !== undefined ? row.remaining_amount_due : Math.max(0, Number(row.subtotal) - Number(row.discount_amount || 0)))
+        );
+
         return {
           id: row.id,
           customerName: row.customer_name,
@@ -522,11 +541,20 @@ export const dbOrders = {
           shippingFee: Number(row.shipping_fee || 0),
           total: Number(row.total),
           currency: (row.currency || 'BDT') as any,
-          advanceDeliveryFeePaid: Boolean(row.advance_delivery_fee_paid),
+          deliveryChargePaid: isDelivPaid,
+          deliveryChargePaidAt: row.delivery_charge_paid_at || undefined,
+          deliveryChargePaidBy: row.delivery_charge_paid_by || undefined,
+          advanceDeliveryFeePaid: isDelivPaid,
           advanceDeliveryFeeTrxId: row.advance_delivery_fee_trx_id || undefined,
           advanceDeliveryFeeMethod: row.advance_delivery_fee_method || undefined,
-          remainingAmountDue: row.remaining_amount_due !== undefined ? Number(row.remaining_amount_due) : undefined,
-          courierPartner: row.courier_partner || 'Steadfast',
+          senderMfsPhone: row.sender_mfs_phone || undefined,
+          mfsMethod: (row.mfs_method || row.advance_delivery_fee_method) as any,
+          remainingAmountDue: codAmount,
+          codAmountToCollect: codAmount,
+          courierPartner: (row.courier_partner || row.courier_name || 'Steadfast') as any,
+          courierName: (row.courier_name || row.courier_partner || 'Steadfast') as any,
+          consignmentId: row.consignment_id || undefined,
+          totalWeightGrams: Number(row.total_weight_grams || 1000),
           idempotencyKey: row.idempotency_key || undefined,
           createdAt: row.created_at,
           trackingNumber: row.tracking_number,
@@ -552,6 +580,9 @@ export const dbOrders = {
 
         if (existingOrder) {
           console.log(`ℹ️ [SUPABASE IDEMPOTENCY] Order with key ${orderData.idempotencyKey} already exists (${existingOrder.id}).`);
+          const isDelivPaid = Boolean(existingOrder.delivery_charge_paid ?? existingOrder.advance_delivery_fee_paid);
+          const codAmount = Number(existingOrder.cod_amount_to_collect ?? existingOrder.remaining_amount_due ?? 0);
+
           return {
             id: existingOrder.id,
             idempotencyKey: existingOrder.idempotency_key,
@@ -572,11 +603,20 @@ export const dbOrders = {
             shippingFee: Number(existingOrder.shipping_fee || 0),
             total: Number(existingOrder.total),
             currency: 'BDT',
-            advanceDeliveryFeePaid: Boolean(existingOrder.advance_delivery_fee_paid),
+            deliveryChargePaid: isDelivPaid,
+            deliveryChargePaidAt: existingOrder.delivery_charge_paid_at || undefined,
+            deliveryChargePaidBy: existingOrder.delivery_charge_paid_by || undefined,
+            advanceDeliveryFeePaid: isDelivPaid,
             advanceDeliveryFeeTrxId: existingOrder.advance_delivery_fee_trx_id || undefined,
             advanceDeliveryFeeMethod: existingOrder.advance_delivery_fee_method || undefined,
-            remainingAmountDue: Number(existingOrder.remaining_amount_due || 0),
+            senderMfsPhone: existingOrder.sender_mfs_phone || undefined,
+            mfsMethod: (existingOrder.mfs_method || existingOrder.advance_delivery_fee_method) as any,
+            remainingAmountDue: codAmount,
+            codAmountToCollect: codAmount,
             courierPartner: existingOrder.courier_partner || 'Steadfast',
+            courierName: (existingOrder.courier_name || existingOrder.courier_partner || 'Steadfast') as any,
+            consignmentId: existingOrder.consignment_id || undefined,
+            totalWeightGrams: Number(existingOrder.total_weight_grams || 1000),
             createdAt: existingOrder.created_at,
             trackingNumber: existingOrder.tracking_number,
           };
@@ -602,12 +642,14 @@ export const dbOrders = {
         );
       }
 
-      // 2. Insert into `orders` table
-      const isCod = orderData.paymentMethod === 'COD';
-      const advancePaid = Boolean(orderData.advanceDeliveryFeePaid || !isCod);
-      const remainingDue = orderData.remainingAmountDue ?? (isCod ? Math.max(0, (orderData.total || 0) - (orderData.shippingFee || 100)) : 0);
+      // 2. Business rules for order:
+      // Product price is COD.
+      // Delivery charge must be paid in advance. Initial status is "Awaiting Delivery Charge", deliveryChargePaid = false.
+      const codAmount = orderData.codAmountToCollect ?? Math.max(0, (orderData.subtotal || 0) - (orderData.discountAmount || 0));
+      const deliveryPaid = Boolean(orderData.deliveryChargePaid || false);
+      const initialStatus: Order['orderStatus'] = orderData.orderStatus || 'Awaiting Delivery Charge';
 
-      const orderRow = {
+      const orderRow: any = {
         id: orderId,
         idempotency_key: orderData.idempotencyKey || null,
         customer_name: orderData.customerName || 'Valued Customer',
@@ -618,19 +660,28 @@ export const dbOrders = {
         city: orderData.city || 'Dhaka',
         address: orderData.address || '',
         notes: orderData.notes || null,
-        payment_method: orderData.paymentMethod || 'COD',
-        payment_status: orderData.paymentStatus || (isCod ? (advancePaid ? 'Delivery Fee Paid' : 'Due') : 'Pending'),
-        order_status: 'Pending',
+        payment_method: 'COD',
+        payment_status: deliveryPaid ? 'Delivery Charge Paid' : 'Due',
+        order_status: initialStatus,
         subtotal: orderData.subtotal || 0,
         discount_amount: orderData.discountAmount || 0,
         shipping_fee: orderData.shippingFee || 100,
         total: orderData.total || 0,
         currency: 'BDT',
-        advance_delivery_fee_paid: advancePaid,
+        delivery_charge_paid: deliveryPaid,
+        delivery_charge_paid_at: orderData.deliveryChargePaidAt || null,
+        delivery_charge_paid_by: orderData.deliveryChargePaidBy || null,
+        advance_delivery_fee_paid: deliveryPaid,
         advance_delivery_fee_trx_id: orderData.advanceDeliveryFeeTrxId || null,
-        advance_delivery_fee_method: orderData.advanceDeliveryFeeMethod || null,
-        remaining_amount_due: remainingDue,
-        courier_partner: orderData.courierPartner || 'Steadfast',
+        advance_delivery_fee_method: orderData.mfsMethod || orderData.advanceDeliveryFeeMethod || null,
+        sender_mfs_phone: orderData.senderMfsPhone || null,
+        mfs_method: orderData.mfsMethod || orderData.advanceDeliveryFeeMethod || null,
+        remaining_amount_due: codAmount,
+        cod_amount_to_collect: codAmount,
+        courier_partner: orderData.courierName || orderData.courierPartner || 'Steadfast',
+        courier_name: orderData.courierName || orderData.courierPartner || 'Steadfast',
+        consignment_id: orderData.consignmentId || null,
+        total_weight_grams: orderData.totalWeightGrams || 1000,
         tracking_number: trackingNumber,
       };
 
@@ -647,7 +698,7 @@ export const dbOrders = {
           order_id: orderId,
           product_id: item.product.id,
           product_name: item.product.name,
-          selected_size: item.selectedSize,
+          selected_size: String(item.selectedSize),
           selected_color: typeof item.selectedColor === 'string' ? item.selectedColor : item.selectedColor?.name || 'Standard',
           unit_price: item.product.price,
           quantity: item.quantity,
@@ -659,50 +710,48 @@ export const dbOrders = {
           console.warn('⚠️ [SUPABASE] Error inserting order_items:', itemErr.message);
         }
 
-        // Try calling atomic decrement RPC first
-        const rpcPayload = items.map(i => ({
-          product_id: i.product.id,
-          size_eu: i.selectedSize,
-          quantity: i.quantity,
-        }));
+        // Decrement stock in database
+        for (const item of items) {
+          try {
+            const isNumericSize = !isNaN(Number(item.selectedSize));
+            const numSize = isNumericSize ? Number(item.selectedSize) : null;
 
-        const { error: rpcErr } = await supabaseClient.rpc('decrement_stock_atomic', {
-          p_order_items: rpcPayload,
-        });
+            // Decrement in product_sizes
+            let sizeQuery = supabaseClient
+              .from('product_sizes')
+              .select('stock_quantity')
+              .eq('product_id', item.product.id);
 
-        if (rpcErr) {
-          // If RPC is not yet created on Supabase project, execute resilient direct update
-          for (const item of items) {
-            try {
-              const { data: sizeRow } = await supabaseClient
-                .from('product_sizes')
-                .select('stock_quantity')
-                .eq('product_id', item.product.id)
-                .eq('size_eu', item.selectedSize)
-                .maybeSingle();
-
-              const currentQty = sizeRow ? sizeRow.stock_quantity : 5;
-              const newQty = Math.max(0, currentQty - item.quantity);
-
-              await supabaseClient
-                .from('product_sizes')
-                .upsert(
-                  {
-                    product_id: item.product.id,
-                    size_eu: item.selectedSize,
-                    stock_quantity: newQty,
-                    is_active: true,
-                  },
-                  { onConflict: 'product_id,size_eu' }
-                );
-
-              await supabaseClient
-                .from('products')
-                .update({ stock: Math.max(0, (item.product.stock || 10) - item.quantity) })
-                .eq('id', item.product.id);
-            } catch (stkErr: any) {
-              console.warn(`⚠️ [SUPABASE] Stock update error for ${item.product.id}:`, stkErr.message);
+            if (numSize !== null) {
+              sizeQuery = sizeQuery.eq('size_eu', numSize);
+            } else {
+              sizeQuery = sizeQuery.eq('size_name', String(item.selectedSize));
             }
+
+            const { data: sizeRow } = await sizeQuery.maybeSingle();
+            const currentQty = sizeRow ? sizeRow.stock_quantity : 5;
+            const newQty = Math.max(0, currentQty - item.quantity);
+
+            await supabaseClient
+              .from('product_sizes')
+              .update({ stock_quantity: newQty })
+              .eq('product_id', item.product.id)
+              .eq(numSize !== null ? 'size_eu' : 'size_name', numSize !== null ? numSize : String(item.selectedSize));
+
+            // Decrement overall product stock
+            const { data: prodRow } = await supabaseClient
+              .from('products')
+              .select('stock')
+              .eq('id', item.product.id)
+              .maybeSingle();
+
+            const pStock = prodRow ? Number(prodRow.stock) : 10;
+            await supabaseClient
+              .from('products')
+              .update({ stock: Math.max(0, pStock - item.quantity) })
+              .eq('id', item.product.id);
+          } catch (stkErr: any) {
+            console.warn(`⚠️ [SUPABASE] Stock decrement error for ${item.product.id}:`, stkErr.message);
           }
         }
       }
@@ -718,26 +767,34 @@ export const dbOrders = {
         city: orderRow.city,
         address: orderRow.address,
         notes: orderRow.notes || undefined,
-        paymentMethod: orderRow.payment_method as any,
-        paymentStatus: orderRow.payment_status as any,
-        orderStatus: 'Pending',
+        paymentMethod: 'COD',
+        paymentStatus: orderRow.payment_status,
+        orderStatus: initialStatus,
         items: items,
         subtotal: orderRow.subtotal,
         discountAmount: orderRow.discount_amount,
         shippingFee: orderRow.shipping_fee,
         total: orderRow.total,
         currency: 'BDT',
-        advanceDeliveryFeePaid: orderRow.advance_delivery_fee_paid,
+        deliveryChargePaid: deliveryPaid,
+        deliveryChargePaidAt: orderRow.delivery_charge_paid_at || undefined,
+        deliveryChargePaidBy: orderRow.delivery_charge_paid_by || undefined,
+        advanceDeliveryFeePaid: deliveryPaid,
         advanceDeliveryFeeTrxId: orderRow.advance_delivery_fee_trx_id || undefined,
         advanceDeliveryFeeMethod: (orderRow.advance_delivery_fee_method as any) || undefined,
-        remainingAmountDue: orderRow.remaining_amount_due,
+        senderMfsPhone: orderRow.sender_mfs_phone || undefined,
+        mfsMethod: (orderRow.mfs_method as any) || undefined,
+        remainingAmountDue: codAmount,
+        codAmountToCollect: codAmount,
         courierPartner: orderRow.courier_partner as any,
+        courierName: orderRow.courier_name as any,
+        consignmentId: orderRow.consignment_id || undefined,
+        totalWeightGrams: orderRow.total_weight_grams,
         createdAt: new Date().toISOString(),
         trackingNumber: trackingNumber,
-        paymentDetails: orderData.paymentDetails,
       };
 
-      console.log(`✅ [SUPABASE] Order created: ${orderId} (${orderRow.customer_name}) - Total: ৳${orderRow.total}`);
+      console.log(`✅ [SUPABASE] Order created: ${orderId} (${orderRow.customer_name}) - COD to collect: ৳${codAmount}`);
       return createdOrder;
     } catch (err: any) {
       console.warn('⚠️ [SUPABASE] Exception in dbOrders.create:', err.message);
@@ -745,18 +802,146 @@ export const dbOrders = {
     }
   },
 
-  async updateStatus(orderId: string, status: Order['orderStatus']): Promise<boolean> {
+  async updateStatus(orderId: string, newStatus: Order['orderStatus']): Promise<boolean> {
     if (!supabaseClient) return false;
 
     try {
+      // Check current status first to prevent duplicate restocks
+      const { data: currentOrder } = await supabaseClient
+        .from('orders')
+        .select('order_status, order_items(*)')
+        .eq('id', orderId)
+        .maybeSingle();
+
+      const previousStatus = currentOrder?.order_status;
+
       const { error } = await supabaseClient
         .from('orders')
-        .update({ order_status: status })
+        .update({ order_status: newStatus })
+        .eq('id', orderId);
+
+      if (error) {
+        console.warn('⚠️ [SUPABASE] Error updating order status:', error.message);
+        return false;
+      }
+
+      // If status changed to Cancelled and was not previously Cancelled, return stock
+      if (newStatus === 'Cancelled' && previousStatus !== 'Cancelled' && currentOrder?.order_items) {
+        for (const item of currentOrder.order_items) {
+          try {
+            const isNumeric = !isNaN(Number(item.selected_size));
+            const numSize = isNumeric ? Number(item.selected_size) : null;
+            const qty = Number(item.quantity || 1);
+
+            // Increment in product_sizes
+            let sizeQuery = supabaseClient
+              .from('product_sizes')
+              .select('stock_quantity')
+              .eq('product_id', item.product_id);
+
+            if (numSize !== null) {
+              sizeQuery = sizeQuery.eq('size_eu', numSize);
+            } else {
+              sizeQuery = sizeQuery.eq('size_name', String(item.selected_size));
+            }
+
+            const { data: sizeRow } = await sizeQuery.maybeSingle();
+            if (sizeRow) {
+              await supabaseClient
+                .from('product_sizes')
+                .update({ stock_quantity: sizeRow.stock_quantity + qty })
+                .eq('product_id', item.product_id)
+                .eq(numSize !== null ? 'size_eu' : 'size_name', numSize !== null ? numSize : String(item.selected_size));
+            }
+
+            // Increment in products
+            const { data: prodRow } = await supabaseClient
+              .from('products')
+              .select('stock')
+              .eq('id', item.product_id)
+              .maybeSingle();
+
+            if (prodRow) {
+              await supabaseClient
+                .from('products')
+                .update({ stock: Number(prodRow.stock) + qty })
+                .eq('id', item.product_id);
+            }
+          } catch (restockErr: any) {
+            console.warn(`⚠️ [SUPABASE] Stock restoration failed for item ${item.product_id}:`, restockErr.message);
+          }
+        }
+      }
+
+      return true;
+    } catch (err: any) {
+      console.warn('⚠️ [SUPABASE] Exception in dbOrders.updateStatus:', err.message);
+      return false;
+    }
+  },
+
+  async markDeliveryChargePaid(orderId: string, adminName: string): Promise<boolean> {
+    if (!supabaseClient) return false;
+
+    try {
+      const now = new Date().toISOString();
+      const { data: order } = await supabaseClient
+        .from('orders')
+        .select('order_status')
+        .eq('id', orderId)
+        .maybeSingle();
+
+      const updatePayload: any = {
+        delivery_charge_paid: true,
+        delivery_charge_paid_at: now,
+        delivery_charge_paid_by: adminName,
+        payment_status: 'Delivery Charge Paid',
+      };
+
+      // If status is Awaiting Delivery Charge, promote to Confirmed
+      if (!order?.order_status || order.order_status === 'Awaiting Delivery Charge' || order.order_status === 'Pending') {
+        updatePayload.order_status = 'Confirmed';
+      }
+
+      const { error } = await supabaseClient
+        .from('orders')
+        .update(updatePayload)
         .eq('id', orderId);
 
       return !error;
     } catch (err: any) {
-      console.warn('⚠️ [SUPABASE] Exception in dbOrders.updateStatus:', err.message);
+      console.warn('⚠️ [SUPABASE] Exception in dbOrders.markDeliveryChargePaid:', err.message);
+      return false;
+    }
+  },
+
+  async updateCourierBooking(
+    orderId: string,
+    courierName: 'Steadfast' | 'Pathao',
+    consignmentId: string,
+    codAmountToCollect?: number
+  ): Promise<boolean> {
+    if (!supabaseClient) return false;
+
+    try {
+      const updatePayload: any = {
+        courier_name: courierName,
+        courier_partner: courierName,
+        consignment_id: consignmentId,
+      };
+      if (codAmountToCollect !== undefined) {
+        updatePayload.cod_amount_to_collect = codAmountToCollect;
+        updatePayload.remaining_amount_due = codAmountToCollect;
+      }
+
+      const { error } = await supabaseClient
+        .from('orders')
+        .update(updatePayload)
+        .eq('id', orderId);
+
+      return !error;
+    } catch (err: any) {
+      console.warn('⚠️ [SUPABASE] Exception in dbOrders.updateCourierBooking:', err.message);
       return false;
     }
   },
@@ -765,7 +950,6 @@ export const dbOrders = {
     orderId: string,
     paymentStatus: Order['paymentStatus'],
     orderStatus?: Order['orderStatus'],
-    extraPaymentDetails?: any
   ): Promise<boolean> {
     if (!supabaseClient) return false;
 
@@ -780,27 +964,80 @@ export const dbOrders = {
         .update(updatePayload)
         .eq('id', orderId);
 
-      if (error) {
-        console.warn('⚠️ [SUPABASE] Error updating order payment status:', error.message);
-      }
-
-      if (extraPaymentDetails) {
-        await supabaseClient.from('payments').upsert({
-          order_id: orderId,
-          payment_method: extraPaymentDetails.paymentMethod || 'SSLCommerz/Card',
-          transaction_id: extraPaymentDetails.transactionId || `TXN-SSL-${Date.now()}`,
-          card_type: extraPaymentDetails.cardType || null,
-          bank_tran_id: extraPaymentDetails.bankTranId || null,
-          amount: extraPaymentDetails.amount || 0,
-          status: paymentStatus === 'Paid' ? 'Success' : 'Failed',
-        }, { onConflict: 'order_id' });
-      }
-
       return !error;
     } catch (err: any) {
       console.warn('⚠️ [SUPABASE] Exception in dbOrders.updatePaymentStatus:', err.message);
       return false;
     }
+  },
+};
+
+/**
+ * STORE SETTINGS REPOSITORY
+ */
+export const dbSettings = {
+  async get(): Promise<StoreSettings> {
+    if (!supabaseClient) {
+      return inMemoryStoreSettings;
+    }
+
+    try {
+      const { data, error } = await supabaseClient
+        .from('store_settings')
+        .select('*')
+        .eq('id', 'default')
+        .maybeSingle();
+
+      if (error || !data) {
+        return inMemoryStoreSettings;
+      }
+
+      return {
+        bkashNumber: data.bkash_number || DEFAULT_STORE_SETTINGS.bkashNumber,
+        nagadNumber: data.nagad_number || DEFAULT_STORE_SETTINGS.nagadNumber,
+        rocketNumber: data.rocket_number || DEFAULT_STORE_SETTINGS.rocketNumber,
+        whatsappNumber: data.whatsapp_number || DEFAULT_STORE_SETTINGS.whatsappNumber,
+        deliveryChargeInsideDhaka: Number(data.delivery_charge_inside_dhaka ?? DEFAULT_STORE_SETTINGS.deliveryChargeInsideDhaka),
+        deliveryChargeOutsideDhaka: Number(data.delivery_charge_outside_dhaka ?? DEFAULT_STORE_SETTINGS.deliveryChargeOutsideDhaka),
+        baseWeightGrams: Number(data.base_weight_grams ?? DEFAULT_STORE_SETTINGS.baseWeightGrams),
+        extraChargePerKg: Number(data.extra_charge_per_kg ?? DEFAULT_STORE_SETTINGS.extraChargePerKg),
+      };
+    } catch (err: any) {
+      console.warn('⚠️ [SUPABASE] Exception in dbSettings.get:', err.message);
+      return inMemoryStoreSettings;
+    }
+  },
+
+  async update(newSettings: Partial<StoreSettings>): Promise<StoreSettings> {
+    inMemoryStoreSettings = {
+      ...inMemoryStoreSettings,
+      ...newSettings,
+    };
+
+    if (!supabaseClient) {
+      return inMemoryStoreSettings;
+    }
+
+    try {
+      const payload: any = {
+        id: 'default',
+        updated_at: new Date().toISOString(),
+      };
+      if (newSettings.bkashNumber !== undefined) payload.bkash_number = newSettings.bkashNumber;
+      if (newSettings.nagadNumber !== undefined) payload.nagad_number = newSettings.nagadNumber;
+      if (newSettings.rocketNumber !== undefined) payload.rocket_number = newSettings.rocketNumber;
+      if (newSettings.whatsappNumber !== undefined) payload.whatsapp_number = newSettings.whatsappNumber;
+      if (newSettings.deliveryChargeInsideDhaka !== undefined) payload.delivery_charge_inside_dhaka = newSettings.deliveryChargeInsideDhaka;
+      if (newSettings.deliveryChargeOutsideDhaka !== undefined) payload.delivery_charge_outside_dhaka = newSettings.deliveryChargeOutsideDhaka;
+      if (newSettings.baseWeightGrams !== undefined) payload.base_weight_grams = newSettings.baseWeightGrams;
+      if (newSettings.extraChargePerKg !== undefined) payload.extra_charge_per_kg = newSettings.extraChargePerKg;
+
+      await supabaseClient.from('store_settings').upsert(payload, { onConflict: 'id' });
+    } catch (err: any) {
+      console.warn('⚠️ [SUPABASE] Exception in dbSettings.update:', err.message);
+    }
+
+    return inMemoryStoreSettings;
   },
 };
 

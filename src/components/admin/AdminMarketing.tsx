@@ -121,8 +121,7 @@ export const AdminMarketing: React.FC = () => {
           <p>VITE_META_PIXEL_ID=XXXXXXXXXXXXXXXX</p>
           <p>GOOGLE_SHEETS_WEBHOOK_URL=https://script.google.com/macros/s/XXXX/exec</p>
           <p>RESEND_API_KEY=re_XXXXXXXXXXXXXXXX</p>
-          <p>SSLCOMMERZ_STORE_ID=your_live_store_id</p>
-          <p>SSLCOMMERZ_STORE_PASSWORD=your_live_password</p>
+          <p>OWNER_EMAIL=orders@kingsmanbd.com</p>
         </div>
       </div>
 

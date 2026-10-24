@@ -191,7 +191,7 @@ export const PolicyView: React.FC<PolicyViewProps> = ({ view, onClose }) => {
             <div className="space-y-3">
               <h5 className="font-bold text-white text-sm">2. Payment Data Security</h5>
               <p>
-                KINGSMAN never stores complete credit card numbers or MFS PINs on our servers. Online card and mobile banking payments are processed directly through bank-grade, PCI-DSS compliant gateways (SSLCommerz).
+                KINGSMAN never asks for or stores account passwords or MFS PINs. The product price is collected strictly in cash upon delivery (COD), while advance delivery charges are transferred directly via customer MFS send-money (bKash / Nagad / Rocket).
               </p>
             </div>
 

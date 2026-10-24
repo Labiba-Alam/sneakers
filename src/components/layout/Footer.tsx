@@ -68,8 +68,8 @@ export const Footer: React.FC = () => {
                 <Lock className="w-6 h-6" />
               </div>
               <div>
-                <h4 className="font-serif-luxury text-sm font-bold text-white uppercase tracking-wider">Secure Payment</h4>
-                <p className="text-xs text-white/60">bKash, Nagad & SSLCommerz</p>
+                <h4 className="font-serif-luxury text-sm font-bold text-white uppercase tracking-wider">Cash on Delivery</h4>
+                <p className="text-xs text-white/60">bKash, Nagad & Rocket Advance</p>
               </div>
             </div>
           </div>
@@ -236,8 +236,7 @@ export const Footer: React.FC = () => {
               <span className="px-2.5 py-1 bg-white/10 text-white font-mono text-[10px] font-bold">bKash</span>
               <span className="px-2.5 py-1 bg-white/10 text-white font-mono text-[10px] font-bold">Nagad</span>
               <span className="px-2.5 py-1 bg-white/10 text-white font-mono text-[10px] font-bold">Rocket</span>
-              <span className="px-2.5 py-1 bg-white/10 text-white font-mono text-[10px] font-bold">SSLCommerz</span>
-              <span className="px-2.5 py-1 bg-white/10 text-white font-mono text-[10px] font-bold">COD</span>
+              <span className="px-2.5 py-1 bg-[#C7A55B]/20 text-[#C7A55B] font-mono text-[10px] font-bold">COD</span>
               <span className="px-2.5 py-1 bg-[#C7A55B]/20 text-[#C7A55B] font-mono text-[10px] font-bold">Steadfast</span>
               <span className="px-2.5 py-1 bg-[#C1121F]/20 text-[#C1121F] font-mono text-[10px] font-bold">Pathao</span>
             </div>

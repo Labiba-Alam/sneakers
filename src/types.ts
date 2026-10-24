@@ -8,19 +8,21 @@ export type GenderType = 'Men' | 'Women' | 'Unisex';
 
 export type CategoryType = SneakerBrand | ClothingType;
 
-export type PaymentMethod = 'COD' | 'SSLCommerz/Card' | 'bKash' | 'Nagad' | 'Rocket';
+export type PaymentMethod = 'COD' | 'bKash' | 'Nagad' | 'Rocket';
 
-export type PaymentStatus = 'Pending' | 'Paid' | 'Failed' | 'Due' | 'Cancelled' | 'Delivery Fee Paid';
+export type PaymentStatus = 'Pending' | 'Delivery Charge Paid' | 'Paid' | 'Cancelled' | 'Due';
 
 export type OrderStatus = 
-  | 'Pending' 
-  | 'Confirmed' 
-  | 'Packaging' 
-  | 'Ready for Pickup' 
-  | 'Shipped' 
-  | 'Delivered' 
-  | 'Cancelled' 
-  | 'Returned';
+  | 'Awaiting Delivery Charge'
+  | 'Confirmed'
+  | 'Packed'
+  | 'Handed to Courier'
+  | 'Delivered'
+  | 'Cancelled'
+  | 'Returned'
+  | 'Pending'
+  | 'Packaging'
+  | 'Shipped';
 
 export type AdminRole = 'Admin' | 'Manager' | 'Staff';
 
@@ -183,6 +185,17 @@ export interface Coupon {
   isActive: boolean;
 }
 
+export interface StoreSettings {
+  bkashNumber: string;
+  nagadNumber: string;
+  rocketNumber: string;
+  whatsappNumber: string;
+  deliveryChargeInsideDhaka: number;
+  deliveryChargeOutsideDhaka: number;
+  baseWeightGrams: number;
+  extraChargePerKg: number;
+}
+
 export interface Order {
   id: string;
   idempotencyKey?: string;
@@ -203,17 +216,25 @@ export interface Order {
   shippingFee: number;
   total: number;
   currency: 'BDT';
+  deliveryChargePaid: boolean;
+  deliveryChargePaidAt?: string;
+  deliveryChargePaidBy?: string;
   advanceDeliveryFeePaid?: boolean;
   advanceDeliveryFeeTrxId?: string;
-  advanceDeliveryFeeMethod?: 'bKash' | 'Nagad' | 'Rocket' | 'Online Gateway';
+  advanceDeliveryFeeMethod?: 'bKash' | 'Nagad' | 'Rocket';
+  senderMfsPhone?: string;
+  mfsMethod?: 'bKash' | 'Nagad' | 'Rocket';
   remainingAmountDue?: number;
+  codAmountToCollect?: number;
   courierPartner?: 'Steadfast' | 'Pathao';
+  courierName?: 'Steadfast' | 'Pathao';
+  consignmentId?: string;
+  totalWeightGrams?: number;
   createdAt: string;
   trackingNumber: string;
   paymentDetails?: {
     transactionId?: string;
     mfsPhone?: string;
-    cardLast4?: string;
   };
 }
 
